@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page.title }} - {{ config.title }}{% endblock title %}
+{% block description %}{{ page.description | default(value=page.summary) }}{% endblock description %}
+
+{% block content %}
+<article class="page">
+    <header class="page-header">
+        <h1>{{ page.title }}</h1>
+        {% if page.date %}
+        <div class="metadata">
+            <time datetime="{{ page.date | date(format="%Y-%m-%d") }}">
+                {{ page.date | date(format="%B %d, %Y") }}
+            </time>
+            {% if page.updated %}
+            <span class="updated">
+                (Updated: <time datetime="{{ page.updated | date(format="%Y-%m-%d") }}">
+                    {{ page.updated | date(format="%B %d, %Y") }}
+                </time>)
+            </span>
+            {% endif %}
+            {% if page.reading_time %}
+            <span class="reading-time">· {{ page.reading_time }} min read</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </header>
+    
+    {% if page.toc and page.toc | length > 0 %}
+    <nav class="table-of-contents">
+        <h2>Contents</h2>
+        <ul>
+        {% for h1 in page.toc %}
+            <li>
+                <a href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
+                {% if h1.children %}
+                <ul>
+                    {% for h2 in h1.children %}
+                    <li>
+                        <a href="{{ h2.permalink | safe }}">{{ h2.title }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </li>
+        {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+    
+    <div class="page-content">
+        {{ page.content | safe }}
+    </div>
+    
+    {% if page.taxonomies.tags %}
+    <footer class="page-footer">
+        <div class="tags">
+            <span>Tags:</span>
+            {% for tag in page.taxonomies.tags %}
+            <a href="/tags/{{ tag | slugify }}/" class="tag">{{ tag }}</a>
+            {% endfor %}
+        </div>
+    </footer>
+    {% endif %}
+</article>
+{% endblock content %}

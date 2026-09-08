@@ -1,0 +1,9 @@
+# Zola build output
+/public/
+
+# Stale artifact from an earlier Hugo attempt
+.hugo_build.lock
+
+# Local Claude Code state
+/.claude/settings.local.json
+/.claude/audit/

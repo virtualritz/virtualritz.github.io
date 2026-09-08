@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ section.title }} - {{ config.title }}{% endblock title %}
+{% block description %}{{ section.description }}{% endblock description %}
+
+{% block content %}
+<article class="section">
+    <header class="section-header">
+        <h1>{{ section.title }}</h1>
+        {% if section.description %}
+        <p class="description">{{ section.description }}</p>
+        {% endif %}
+    </header>
+    
+    {% if section.content %}
+    <div class="section-content">
+        {{ section.content | safe }}
+    </div>
+    {% endif %}
+    
+    {% set pages = paginator.pages | default(value=section.pages) %}
+    {% if pages %}
+    <div class="page-list">
+        {% for page in pages %}
+        <article class="list-item">
+            <h2><a href="{{ page.permalink }}">{{ page.title }}</a></h2>
+            <div class="metadata">
+                {% if page.date %}
+                <time datetime="{{ page.date | date(format="%Y-%m-%d") }}">
+                    {{ page.date | date(format="%B %d, %Y") }}
+                </time>
+                {% endif %}
+                {% if page.reading_time %}
+                <span class="reading-time">· {{ page.reading_time }} min read</span>
+                {% endif %}
+            </div>
+            {% if page.description %}
+            <p class="description">{{ page.description }}</p>
+            {% elif page.summary %}
+            <p class="summary">{{ page.summary | truncate(length=200) }}</p>
+            {% endif %}
+            {% if page.taxonomies.tags %}
+            <div class="tags">
+                {% for tag in page.taxonomies.tags %}
+                <span class="tag">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if paginator %}
+    <nav class="pagination">
+        {% if paginator.previous %}
+        <a href="{{ paginator.previous }}" class="prev">← Previous</a>
+        {% endif %}
+        <span class="page-number">Page {{ paginator.current_index }} of {{ paginator.number_pagers }}</span>
+        {% if paginator.next %}
+        <a href="{{ paginator.next }}" class="next">Next →</a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</article>
+{% endblock content %}

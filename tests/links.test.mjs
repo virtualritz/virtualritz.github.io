@@ -7,7 +7,12 @@ test("links use a gradient underline with zero-blur shadow cutouts", async () =>
   const rule = css.match(/\.article-body\s+a\b[^{]*\{([^}]*)\}/)[1];
   assert.match(rule, /text-decoration:\s*none/);
   assert.match(rule, /linear-gradient/);
-  assert.match(rule, /background-size:\s*2px 1px/);
+  // dots are 3px 1.5px (50% bigger than the original 2px 1px), vertically
+  // re-centred so the thicker dot still sits under the baseline: old
+  // centre was 1.9px - .5px = 1.4px above the box bottom, so the new top
+  // offset is 1.4 + (1.5 / 2) = 2.15px.
+  assert.match(rule, /background-size:\s*3px 1\.5px/);
+  assert.match(rule, /background-position:\s*0 calc\(100% - 2\.15px\)/);
   // every shadow must be zero-blur and vertical-only, so justif still
   // protrudes glyphs through it (spec §7)
   const shadows = rule.match(/text-shadow:([^;]*)/)[1];

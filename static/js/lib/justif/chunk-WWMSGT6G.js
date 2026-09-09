@@ -1155,11 +1155,17 @@ function buildItems(texts, runs, opts, measure) {
         lb.width += piece.padEndPx;
         lb.padPx = (lb.padPx ?? 0) + piece.padEndPx;
       }
+      // SITE PATCH 2/2, part four (justif 0.9.1 — report upstream). `inkEndPx`
+      // is the slice of `padEndPx` that is generated-content ink rather than
+      // padding (see generatedInlineAdvance in index.js). It must widen the
+      // box — `lb.width` above already did that — but must never become
+      // protrudable: padding may hang past the measure, a glyph may not.
+      const protrudableEndPad = (piece.padEndPx ?? 0) - (piece.inkEndPx ?? 0);
       if (piece.boxEndProtrusionPx !== void 0) {
         lb.paintedEnd = true;
-        lb.rp = opts.protrusion === false ? 0 : Math.max(piece.boxEndProtrusionPx, piece.padEndPx ?? 0);
+        lb.rp = opts.protrusion === false ? 0 : Math.max(piece.boxEndProtrusionPx, protrudableEndPad);
       } else if (lb.paintedEnd === true) {
-        if (opts.protrusion !== false) lb.rp += piece.padEndPx ?? 0;
+        if (opts.protrusion !== false) lb.rp += protrudableEndPad;
       } else {
         lb.rp = 0;
       }

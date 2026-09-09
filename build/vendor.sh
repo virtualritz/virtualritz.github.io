@@ -29,3 +29,10 @@ cp "$TMP/package/dist/chunk-ZW2EUTPS.js" "$DEST/chunk-ZW2EUTPS.js"
 cp "$TMP/package/LICENSE" "$DEST/LICENSE"
 printf '%s\n' "$V" > "$DEST/VERSION"
 echo "vendored justif $V into $DEST"
+# This overwrites two site-local patches to the bundle (search it for
+# "SITE PATCH"): the intruded-line clamp in intrudedLineCount, and the
+# ::before/::after advance fold in readParagraph/buildItems. Re-apply them
+# from docs/superpowers/reports/2026-09-09-justif-float-intrusion.md, or
+# drop them if the bump already carries the upstream fix. `npm test` fails
+# until one or the other is done.
+echo "re-apply the SITE PATCH hunks — see docs/superpowers/reports/2026-09-09-justif-float-intrusion.md"

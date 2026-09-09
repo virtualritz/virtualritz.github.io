@@ -1333,7 +1333,16 @@ function intrudedLineCount(lines, content, paragraphStyle, floatSide, inlineSize
     }
   }
   const firstLine = lines[0];
-  const textTop = firstLine !== void 0 && firstLine.top < floatBottom ? firstLine.top : content.top;
+  // SITE PATCH 1/2 (justif 0.9.1 — report upstream). `lines[0].top` comes from
+  // Range client rects, i.e. text ink, not the line box. An italic ascender
+  // (or any taller inline) starts it a pixel ABOVE the paragraph's content
+  // top, and that pixel inflates an exact 3.0 into 3.026, which the Math.ceil
+  // below turns into a fourth intruded line — measured on this site's NSI
+  // standfirst: floatBottom 500.74, firstLine.top 385.98, content.top 386.98,
+  // lineHeight 37.92. Line boxes are laid out from content.top downwards, so
+  // nothing can be intruded above it: clamp. The `- 1e-6` epsilon below is a
+  // rounding guard, orders of magnitude too small to absorb a whole pixel.
+  const textTop = firstLine !== void 0 && firstLine.top < floatBottom ? Math.max(firstLine.top, content.top) : content.top;
   const geometricLines = Math.max(1, Math.ceil((floatBottom - textTop) / content.lineHeight - 1e-6));
   return Math.max(affected, geometricLines);
 }
@@ -1784,6 +1793,52 @@ function inlineInsets(elStyle, direction) {
     end: (parseFloat(rtl ? elStyle.paddingLeft : elStyle.paddingRight) || 0) + (parseFloat(rtl ? elStyle.borderLeftWidth : elStyle.borderRightWidth) || 0)
   };
 }
+// SITE PATCH 2/2 (justif 0.9.1 — report upstream). inlineInsets above reads
+// padding and border only, so an inline ancestor's ::before/::after generated
+// content is invisible to the scan even though it has advance width. Every
+// line carrying such a pseudo (here `.article-body a[rel~="noopener"]::after
+// {content:"\2197"}`, ~16px at this body size) is therefore broken to a width
+// the browser then paints wider. Off a float the correction pass absorbs the
+// difference; beside a leading float it cannot, because each intruded line is
+// emitted as `white-space:nowrap` segments closed by a forced break, leaving
+// the browser no break opportunity — it drops the whole over-wide line below
+// the float and orphans it. So measure string-valued generated content and
+// hand it to the scan as extra start/end inset: buildItems already adds inset
+// to the box width (chunk-WWMSGT6G.js `lb.width += piece.padEndPx`) and
+// measureLineExtent already re-adds it as `decorPx`. Content that is not a
+// plain string — counters(), attr(), url(), images, anything escaped — stays
+// unmodelled, exactly as it was before this patch.
+function generatedContentText(value) {
+  const source = value.trim();
+  if (source === "" || source === "none" || source === "normal") return null;
+  if (source.includes("\\")) return null;
+  let text = "";
+  let i = 0;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+      i++;
+      continue;
+    }
+    if (ch === "/") return text;
+    if (ch !== '"' && ch !== "'") return null;
+    const close = source.indexOf(ch, i + 1);
+    if (close < 0) return null;
+    text += source.slice(i + 1, close);
+    i = close + 1;
+  }
+  return text;
+}
+function generatedInlineAdvance(view, el, pseudo) {
+  const style = view.getComputedStyle(el, pseudo);
+  if (style === null) return 0;
+  const text = generatedContentText(style.getPropertyValue("content") || "none");
+  if (text === null) return 0;
+  if (style.display === "none" || style.float !== "none") return 0;
+  if (style.position !== "static" && style.position !== "relative") return 0;
+  const box = pxValue(style.marginLeft) + pxValue(style.marginRight) + pxValue(style.paddingLeft) + pxValue(style.paddingRight) + pxValue(style.borderLeftWidth) + pxValue(style.borderRightWidth);
+  return (text === "" ? 0 : measureWidth(text, fontSpecOf(style))) + box;
+}
 function supportedTextTransform(value) {
   return value === "none" || value === "uppercase" || value === "lowercase";
 }
@@ -1907,8 +1962,10 @@ function readParagraph(p, batch) {
   const hardBreaks = [];
   let skip = null;
   let nextAtomicKey = 0;
-  const attachInlineExtras = (el, before, insets, padded, painted) => {
-    if (!padded && !painted.start && !painted.end) return null;
+  const attachInlineExtras = (el, before, insets, padded, painted, generated) => {
+    const generatedStart = generated?.start ?? 0;
+    const generatedEnd = generated?.end ?? 0;
+    if (!padded && !painted.start && !painted.end && generatedStart === 0 && generatedEnd === 0) return null;
     const inside = runs.slice(before);
     let firstBoxAt = -1;
     let lastBoxAt = -1;
@@ -1943,6 +2000,23 @@ function readParagraph(p, batch) {
         }
         inside[inside.length - 1].boxEndProtrusionPx = endInset;
         inside[lastBoxAt].boxEndProtrusionOwner = el;
+      }
+    }
+    // SITE PATCH 2/2, part two. Applied AFTER the painted-protrusion sums
+    // above on purpose: generated content is ink, not decoration, so it must
+    // widen the line model without also raising `boxEndProtrusionPx`, which
+    // would let the glyph hang past the measure (chunk-WWMSGT6G.js
+    // `lb.rp = Math.max(boxEndProtrusionPx, padEndPx)`).
+    if ((generatedStart > 0 || generatedEnd > 0) && firstBoxAt >= 0) {
+      const firstRun = runs[before];
+      const lastRun = runs[runs.length - 1];
+      if (generatedStart > 0) {
+        firstRun.padStartPx = (firstRun.padStartPx ?? 0) + generatedStart;
+      }
+      if (generatedEnd > 0) {
+        lastRun.padEndPx = (lastRun.padEndPx ?? 0) + generatedEnd;
+        lastRun.inkEndPx = (lastRun.inkEndPx ?? 0) + generatedEnd;
+        lastRun.padEndOwner ?? (lastRun.padEndOwner = el);
       }
     }
     return null;
@@ -2011,9 +2085,14 @@ function readParagraph(p, batch) {
         const childKey = elStyle.whiteSpace === "nowrap" ? atomicKey ?? nextAtomicKey++ : atomicKey;
         const before = runs.length;
         const paintedHere = paintedInlineEdges(elStyle, direction);
+        // SITE PATCH 2/2, part three: see generatedInlineAdvance above.
+        const generatedHere = {
+          start: generatedInlineAdvance(view, el, "::before"),
+          end: generatedInlineAdvance(view, el, "::after")
+        };
         walk(el, [...chain, el], indexSpec(elStyle), childKey, firstLetterInnerStyle(elStyle, cs));
         if (skip !== null) return;
-        skip = attachInlineExtras(el, before, insets, padded, paintedHere);
+        skip = attachInlineExtras(el, before, insets, padded, paintedHere, generatedHere);
         if (skip !== null) return;
       }
     }
@@ -3358,6 +3437,8 @@ function runTexts(scan) {
     boxEndProtrusionPx: r.boxEndProtrusionPx,
     padStartPx: r.padStartPx,
     padEndPx: r.padEndPx,
+    // SITE PATCH 2/2, part five: see chunk-WWMSGT6G.js's `protrudableEndPad`.
+    inkEndPx: r.inkEndPx,
     atomicKey: r.atomicKey,
     // The core needs the object's advance and nothing else about it; its
     // element and styling stay on the scan, where the writer reads them.

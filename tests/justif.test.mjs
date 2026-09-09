@@ -270,3 +270,153 @@ test("hyphens still fully occupy the base latinProtrusion table (colon/semicolon
     "colon/semicolon/!/? must not be appended to the hanging character set",
   );
 });
+
+// ---------------------------------------------------------------------------
+// The two site-local patches to the vendored justif 0.9.1
+// (docs/superpowers/reports/2026-09-09-justif-float-intrusion.md). Both live
+// inside a third-party bundle, so a version bump silently drops them: these
+// tests fail loudly when that happens. There is no DOM emulator in this
+// project (and no npm dependencies at all), so the patched logic is exercised
+// by lifting the pure functions out of the bundle's source text and
+// evaluating them, rather than by driving a browser.
+
+function vendoredJustif() {
+  return readFileSync(root + "static/js/lib/justif/index.js", "utf8");
+}
+
+// Lift `function <name>(...) { ... }` out of the bundle by brace matching.
+function liftFunction(src, name) {
+  const at = src.indexOf(`function ${name}(`);
+  assert.ok(at !== -1, `justif no longer defines ${name}()`);
+  const body = extractBalanced(src, at, "{");
+  assert.ok(body, `could not brace-match the body of ${name}()`);
+  return src.slice(at, body.end + 1);
+}
+
+test("patch 1: an exactly-three-line float does not read as four intruded lines", () => {
+  const src = vendoredJustif();
+  const evaluate = new Function(
+    `${liftFunction(src, "lastLineRaggedAt")}
+     ${liftFunction(src, "intrudedLineCount")}
+     return intrudedLineCount;`,
+  );
+  const intrudedLineCount = evaluate();
+
+  // Measured on /essays/nsi-vs-hydra-vs-riley/ before the patch: a 113.76px
+  // drop-cap box (3 x 37.92px line-height) sitting at the paragraph's content
+  // top, whose first *text* rect starts 1px above that content top because
+  // the standfirst is italic and its ascenders overshoot the line box.
+  const lineHeight = 37.92;
+  const contentTop = 386.98;
+  const floatBottom = contentTop + 3 * lineHeight; // 500.74
+  const content = { left: 0, right: 781, top: contentTop, lineHeight };
+  const paragraphStyle = {
+    textAlign: "justify",
+    direction: "ltr",
+    getPropertyValue: () => "auto",
+  };
+  const inlineSize = 68.93;
+  const lines = [
+    { left: inlineSize, right: 781, top: 385.98, bottom: 419.9 },
+    { left: inlineSize, right: 781, top: contentTop + lineHeight },
+    { left: inlineSize, right: 781, top: contentTop + 2 * lineHeight },
+    { left: 0, right: 781, top: floatBottom },
+  ];
+
+  assert.equal(
+    intrudedLineCount(
+      lines,
+      content,
+      paragraphStyle,
+      "left",
+      inlineSize,
+      floatBottom,
+      0,
+    ),
+    3,
+    "a float exactly three line-heights tall intrudes into three lines; " +
+      "taking the ink top of an italic first line inflated 3.0 to 3.026, " +
+      "which Math.ceil rounded up to a fourth (narrowed) line",
+  );
+
+  // The same paragraph set in roman, whose first text rect sits *below* the
+  // content top, must be unaffected by the clamp.
+  const roman = lines.map((l, i) => (i === 0 ? { ...l, top: 389.2 } : l));
+  assert.equal(
+    intrudedLineCount(
+      roman,
+      content,
+      paragraphStyle,
+      "left",
+      inlineSize,
+      floatBottom,
+      0,
+    ),
+    3,
+  );
+});
+
+test("patch 2: only plain-string generated content is measured", () => {
+  const src = vendoredJustif();
+  const generatedContentText = new Function(
+    `${liftFunction(src, "generatedContentText")}
+     return generatedContentText;`,
+  )();
+
+  // What getComputedStyle(a, "::after").content actually returns for
+  // sass/_links.scss's external-link mark.
+  assert.equal(generatedContentText('"↗"'), "↗");
+  assert.equal(generatedContentText('"↗" / ""'), "↗");
+  assert.equal(generatedContentText('"[" "]"'), "[]");
+  // No pseudo, or nothing generated.
+  assert.equal(generatedContentText("none"), null);
+  assert.equal(generatedContentText("normal"), null);
+  // Not measurable from the computed value alone: left unmodelled, exactly
+  // as the whole feature was before the patch.
+  assert.equal(generatedContentText('counters(toc, ".") "  "'), null);
+  assert.equal(generatedContentText("attr(data-x)"), null);
+  assert.equal(generatedContentText('url("i.png")'), null);
+  assert.equal(generatedContentText('"a\\"b"'), null);
+});
+
+test("patch 2: generated-content advance reaches the line model but not the protrusion", () => {
+  const src = vendoredJustif();
+  const chunk = readFileSync(
+    root + "static/js/lib/justif/chunk-WWMSGT6G.js",
+    "utf8",
+  );
+
+  // The scan must fold ::before/::after into the run insets the breaker
+  // already widens boxes by.
+  assert.match(
+    src,
+    /generatedInlineAdvance\(view,\s*el,\s*["'`]::before["'`]\)/,
+  );
+  assert.match(
+    src,
+    /generatedInlineAdvance\(view,\s*el,\s*["'`]::after["'`]\)/,
+  );
+  assert.match(
+    src,
+    /lastRun\.padEndPx\s*=\s*\(lastRun\.padEndPx\s*\?\?\s*0\)\s*\+\s*generatedEnd/,
+    "generated content must widen the modelled run, or the browser paints " +
+      "lines wider than justif broke them",
+  );
+  // ...and must be tagged as ink so it can never hang past the measure.
+  assert.match(
+    src,
+    /lastRun\.inkEndPx\s*=\s*\(lastRun\.inkEndPx\s*\?\?\s*0\)\s*\+\s*generatedEnd/,
+  );
+  assert.match(src, /inkEndPx:\s*r\.inkEndPx/, "runTexts must forward inkEndPx");
+  assert.match(
+    chunk,
+    /protrudableEndPad\s*=\s*\(piece\.padEndPx\s*\?\?\s*0\)\s*-\s*\(piece\.inkEndPx\s*\?\?\s*0\)/,
+    "padding may hang past the measure; a generated glyph may not",
+  );
+  assert.doesNotMatch(
+    chunk,
+    /lb\.rp\s*=\s*opts\.protrusion\s*===\s*false\s*\?\s*0\s*:\s*Math\.max\(piece\.boxEndProtrusionPx,\s*piece\.padEndPx/,
+    "the unpatched rp assignment would let the external-link mark hang " +
+      "into the right margin",
+  );
+});

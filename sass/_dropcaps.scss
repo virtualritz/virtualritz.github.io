@@ -1,1 +1,31 @@
-// filled in by a later task
+.dropcap-box {
+  float: left;
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.dropcap {
+  position: absolute;
+  left: 0;
+  font-family: var(--initial);
+  line-height: 1;
+  white-space: pre;
+  color: var(--ink);
+  // the letter is duplicated into .sr for accessibility/copy-paste; this
+  // decorative glyph must not also be selectable, or copying the
+  // paragraph doubles the first letter.
+  user-select: none;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}

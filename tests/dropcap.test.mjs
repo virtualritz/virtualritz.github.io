@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { capGeometry, solveWeight } from "../static/js/lib/dropcap-geometry.js";
 
 // EB Garamond at 24px/1.58, measured ratios
@@ -65,4 +66,31 @@ test("solveWeight hits the target stroke ratio", () => {
   const stem = (w) => 0.0002 * w;
   const w = solveWeight(stem, 1.7, 5.0, 100);
   assert.ok(Math.abs((stem(w) * 100) / 1.7 - 5.0) < 0.05);
+});
+
+// --- dropcaps.js source: the DOM-insertion order that justif's leading-
+// float check depends on. No DOM is available under `node --test`, so
+// this pins the invariant at the source level instead (see sidenotes.test.mjs
+// for the same pattern). ---
+
+const dropcapsSrc = () =>
+  readFileSync(new URL("../static/js/dropcaps.js", import.meta.url), "utf8");
+
+test("the .sr span is inserted after the box, not prepended to the paragraph", () => {
+  const s = dropcapsSrc();
+  // p.prepend(box) makes .dropcap-box p's first child. justif declines any
+  // paragraph whose floated element isn't the leading direct child, so
+  // nothing may be inserted ahead of the box afterwards. p.prepend(sr) is
+  // exactly that bug: it runs after p.prepend(box) and reinserts .sr in
+  // front of it, demoting the box to second child.
+  assert.doesNotMatch(
+    s,
+    /p\.prepend\(sr\)/,
+    "prepending .sr to p would displace the float from p's first-child position",
+  );
+  assert.match(
+    s,
+    /box\.after\(sr\)/,
+    "must insert .sr immediately after the box so the box stays p's first child",
+  );
 });

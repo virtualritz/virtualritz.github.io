@@ -179,11 +179,16 @@ async function place(article) {
   box.append(glyph);
   p.prepend(box);
 
-  // keep the letter for screen readers and copy/paste
+  // keep the letter for screen readers and copy/paste. Insert it after
+  // the box, not by prepending it to the paragraph: justif requires the
+  // floated .dropcap-box to be p's leading direct child ("floated element
+  // is not a leading direct child" otherwise), and prepending sr to p
+  // here would run after the box's own prepend above and displace it to
+  // second child.
   const sr = document.createElement("span");
   sr.className = "sr";
   sr.textContent = letter;
-  p.prepend(sr);
+  box.after(sr);
 }
 
 const article = document.querySelector("#article.essay");

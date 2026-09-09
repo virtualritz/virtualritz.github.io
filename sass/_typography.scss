@@ -1,1 +1,235 @@
-// filled in by a later task
+#article {
+  max-width: var(--measure);
+}
+
+.article-body {
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
+  text-wrap: pretty;
+  hanging-punctuation: allow-end; // inert in Chrome today; free when it ships
+  font-variant-numeric: oldstyle-nums;
+
+  p {
+    margin: 0;
+    text-indent: var(--indent);
+  }
+
+  // first paragraph, and any paragraph opening a section, sits flush
+  > p:first-of-type,
+  h1 + p,
+  h2 + p,
+  h3 + p,
+  h4 + p,
+  blockquote + p,
+  figure + p,
+  pre + p,
+  ul + p,
+  ol + p,
+  table + p {
+    text-indent: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--serif);
+    text-align: left;
+    text-wrap: balance;
+    hyphens: manual;
+    margin: 1.6em 0 0.6em;
+  }
+
+  h1 {
+    font-size: 40px;
+    line-height: 1;
+    font-weight: 600;
+    font-variant: small-caps;
+    letter-spacing: -0.75px;
+    border-bottom: 0.8px solid var(--rule-strong);
+    padding-bottom: 1px;
+  }
+
+  h2 {
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 700;
+    text-transform: uppercase;
+    border-bottom: 0.8px dotted var(--rule-strong);
+    padding-bottom: 1.4px;
+  }
+
+  h3 {
+    font-size: 27px;
+    line-height: 1;
+    font-weight: 700;
+  }
+  h4 {
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 700;
+  }
+
+  blockquote {
+    margin: 1.2em 0 1.2em 1.4em;
+    padding-left: 1em;
+    border-left: 2px solid var(--rule);
+    color: var(--muted);
+  }
+
+  ul,
+  ol {
+    margin: 1em 0;
+    padding-left: 1.6em;
+    text-align: left;
+    hyphens: manual;
+  }
+  li + li {
+    margin-top: 0.35em;
+  }
+
+  code,
+  kbd,
+  samp {
+    font-family: var(--mono);
+    font-size: 0.82em;
+    background: var(--box);
+    padding: 0.08em 0.24em;
+    border-radius: 2px;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.78em;
+    line-height: 1.5;
+    background: var(--box);
+    border: 0.8px solid var(--rule);
+    padding: 0.9em 1em;
+    overflow-x: auto;
+    text-align: left;
+    hyphens: manual;
+
+    code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82em;
+    font-variant-numeric: tabular-nums lining-nums;
+    text-align: left;
+    hyphens: manual;
+    margin: 1.4em 0;
+  }
+  th,
+  td {
+    border-bottom: 0.8px solid var(--rule);
+    padding: 0.42em 0.6em;
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--sans);
+    font-size: 0.86em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    border-bottom: 0.8px solid var(--rule-strong);
+  }
+
+  // wide content scrolls in its own box; the page never scrolls sideways
+  .scroll-x {
+    overflow-x: auto;
+  }
+
+  // punctuation spacing, emitted by punctuation.js (spec §8)
+  .emd {
+    padding-inline: var(--emd-before) var(--emd-after);
+  }
+  .sg {
+    padding-inline-end: var(--sentence-gap);
+  }
+}
+
+.article-meta {
+  font-family: var(--sans);
+  font-size: 0.62em;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  text-align: center;
+  margin: 0.8em 0 1.6em;
+  font-variant-numeric: oldstyle-nums;
+
+  a {
+    color: inherit;
+  }
+}
+
+.abstract {
+  background: var(--box);
+  border: 0.8px solid var(--rule);
+  padding: 1em 1.2em;
+  margin: 0 0 1.6em;
+  font-size: 0.92em;
+
+  p {
+    text-indent: 0;
+  }
+  p + p {
+    margin-top: 0.6em;
+  }
+}
+
+#site-nav {
+  display: flex;
+  gap: 1.1em;
+  align-items: baseline;
+  font-family: var(--sans);
+  font-size: 0.56em;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  padding: 1.4em 0 0.8em;
+  border-bottom: 0.8px solid var(--rule);
+
+  a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+  #theme-toggle {
+    margin-left: auto;
+    background: none;
+    border: 0.8px solid var(--rule);
+    color: var(--ink);
+    font-size: 1em;
+    padding: 0.2em 0.5em;
+    cursor: pointer;
+  }
+}
+
+#site-footer {
+  font-family: var(--sans);
+  font-size: 0.56em;
+  color: var(--muted);
+  border-top: 0.8px solid var(--rule);
+  margin-top: 4em;
+  padding: 1.2em 0 2em;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+
+  &:focus {
+    left: 1em;
+    top: 1em;
+    background: var(--paper);
+    padding: 0.5em;
+    z-index: 10;
+  }
+}

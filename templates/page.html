@@ -1,66 +1,47 @@
-{% extends "base.html" %}
-
-{% block title %}{{ page.title }} - {{ config.title }}{% endblock title %}
-{% block description %}{{ page.description | default(value=page.summary) }}{% endblock description %}
-
-{% block content %}
-<article class="page">
-    <header class="page-header">
-        <h1>{{ page.title }}</h1>
-        {% if page.date %}
-        <div class="metadata">
-            <time datetime="{{ page.date | date(format="%Y-%m-%d") }}">
-                {{ page.date | date(format="%B %d, %Y") }}
-            </time>
-            {% if page.updated %}
-            <span class="updated">
-                (Updated: <time datetime="{{ page.updated | date(format="%Y-%m-%d") }}">
-                    {{ page.updated | date(format="%B %d, %Y") }}
-                </time>)
-            </span>
-            {% endif %}
-            {% if page.reading_time %}
-            <span class="reading-time">· {{ page.reading_time }} min read</span>
-            {% endif %}
-        </div>
-        {% endif %}
-    </header>
-    
-    {% if page.toc and page.toc | length > 0 %}
-    <nav class="table-of-contents">
-        <h2>Contents</h2>
-        <ul>
-        {% for h1 in page.toc %}
-            <li>
-                <a href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
-                {% if h1.children %}
-                <ul>
-                    {% for h2 in h1.children %}
-                    <li>
-                        <a href="{{ h2.permalink | safe }}">{{ h2.title }}</a>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-            </li>
-        {% endfor %}
-        </ul>
-    </nav>
-    {% endif %}
-    
-    <div class="page-content">
-        {{ page.content | safe }}
+{% extends "base.html" %} {% block title %}{{ page.title }} · {{ config.title
+}}{% endblock title %} {% block description %}{% if page.description %}{{
+page.description }}{% elif page.summary %}{{ page.summary | striptags }}{% else
+%}{{ config.description }}{% endif %}{% endblock description %} {% block content
+%}
+<article id="article" class="essay">
+  <header>
+    <h1>{{ page.title }}</h1>
+    <div class="article-meta">
+      {% if page.date %}
+      <time datetime="{{ page.date }}"
+        >{{ page.date | date(format="%-d %B %Y") }}</time
+      >
+      {% endif %} {% if page.reading_time %} · {{ page.reading_time }} min{%
+      endif %} {% if page.taxonomies.tags %} · {% for tag in
+      page.taxonomies.tags %}<a
+        href="{{ get_taxonomy_url(kind='tags', name=tag) }}"
+        >{{ tag }}</a
+      >{% if not loop.last %}, {% endif %}{% endfor %} {% endif %}
     </div>
-    
-    {% if page.taxonomies.tags %}
-    <footer class="page-footer">
-        <div class="tags">
-            <span>Tags:</span>
-            {% for tag in page.taxonomies.tags %}
-            <a href="/tags/{{ tag | slugify }}/" class="tag">{{ tag }}</a>
-            {% endfor %}
-        </div>
-    </footer>
-    {% endif %}
+  </header>
+
+  {% if page.toc %}
+  <nav id="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      {% for h in page.toc %}
+      <li>
+        <a href="{{ h.permalink | safe }}">{{ h.title }}</a>
+        {% if h.children %}
+        <ol>
+          {% for c in h.children %}
+          <li><a href="{{ c.permalink | safe }}">{{ c.title }}</a></li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </nav>
+  {% endif %}
+
+  <div class="article-body">{{ page.content | safe }}</div>
 </article>
-{% endblock content %}
+{% endblock content %} {% block scripts %}
+<script type="module" src="{{ get_url(path='js/main.js') }}"></script>
+{% endblock scripts %}

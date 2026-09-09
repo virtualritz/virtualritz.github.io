@@ -13,6 +13,9 @@
 # SDD scratch workspace
 /.superpowers/
 
+# Build artifacts
+/build/.fontcache/
+
 # node
 /node_modules/
 /tests/.out/

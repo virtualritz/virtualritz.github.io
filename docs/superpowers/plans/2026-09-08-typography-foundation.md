@@ -225,7 +225,7 @@ git commit -m "build: add Zola 0.23 build harness and node --test runner"
 - Consumes: nothing.
 - Produces: `static/fonts/manifest.json`, shape:
   `{ "faces": [{ "family": string, "style": "normal"|"italic", "weight": string, "file": string, "features": string[] }],
-   "metrics": { "<family>": { "upem": number, "xem": number, "capem": number } } }`
+ "metrics": { "<family>": { "upem": number, "xem": number, "capem": number } } }`
   Task 9 reads `metrics` for the drop-cap stroke ratio.
 
 - [ ] **Step 1: Write the failing test**
@@ -299,7 +299,7 @@ webfonts strip most OpenType features; we need smcp, pcap, dlig and the
 italic swashes. Thunder is copied verbatim: its EULA forbids modifying
 the files, and the vendor already ships WOFF2.
 """
-import base64, json, os, shutil, subprocess, sys, zipfile, urllib.request
+import hashlib, json, os, shutil, subprocess, sys, zipfile, urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -332,7 +332,9 @@ SPACE_CPS = [0x2009, 0x200A, 0x2013, 0x2014, 0x2007, 0x2008]
 
 def fetch(url: str) -> Path:
     CACHE.mkdir(parents=True, exist_ok=True)
-    dest = CACHE / url.rsplit("/", 1)[-1]
+    basename = url.rsplit("/", 1)[-1]
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+    dest = CACHE / f"{url_hash}-{basename}"
     if not dest.exists():
         print(f"  fetch {dest.name}")
         urllib.request.urlretrieve(url, dest)
@@ -340,11 +342,12 @@ def fetch(url: str) -> Path:
 
 
 def subset(src: Path, out: Path) -> None:
-    subprocess.run([sys.executable, "-m", "fontTools.subset", str(src),
-                    f"--unicodes={SUBSET}", "--layout-features=*",
-                    "--flavor=woff2", "--no-hinting", "--desubroutinize",
-                    f"--output-file={out}"], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    result = subprocess.run([sys.executable, "-m", "fontTools.subset", str(src),
+                             f"--unicodes={SUBSET}", "--layout-features=*",
+                             "--flavor=woff2", "--no-hinting", "--desubroutinize",
+                             f"--output-file={out}"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"fontTools.subset failed for {src}:\n{result.stderr}")
 
 
 def audit(path: Path) -> dict:
@@ -2513,6 +2516,13 @@ git commit -m "feat: sidenotes hoisted from Zola footnotes with collision resolu
 
 ### Task 11: Components, theme toggle, remaining templates
 
+**Correction (post-implementation):** Zola 0.23 removed shortcodes
+entirely. "Shortcode" and `{{ name(...) }}` invocation below are
+planning-era terminology; these three ship as Tera components instead,
+invoked as `{% <name> %}body{% </name> %}`. See
+`templates/shortcodes/admonition.html`'s header comment for the actual
+mechanism — the directory is kept under that name only for continuity.
+
 **Files:**
 
 - Modify: `sass/_components.scss`
@@ -2868,7 +2878,8 @@ git commit -m "feat: components, theme toggle, section and taxonomy templates"
 
 **Interfaces:**
 
-- Consumes: every shortcode and CSS class from Tasks 4–11.
+- Consumes: every component (see Task 11's correction note — planning-era
+  "shortcode") and CSS class from Tasks 4–11.
 - Produces: nothing.
 
 - [ ] **Step 1: Write the failing test**

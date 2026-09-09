@@ -313,8 +313,14 @@ is invisible to it. It also injects `<br>` per visual line, which its own
 README notes breaks copy/paste.
 
 justif protrudes its own inserted hyphens, preserves selection, copy and
-find-in-page, and explicitly handles _"sharp (zero-blur) vertical-only
-underline shadows"_ — precisely gwern's link underline technique.
+find-in-page, and explicitly handles _"sharp (zero-blur) underline
+shadows"_ — precisely gwern's link underline technique.
+
+_Correction:_ an earlier revision of this line said "vertical-only"
+offsets. Four of the seven shadows this site ships carry horizontal
+offsets (±0.05em, ±0.16em), required for the descender cutout, and
+protrusion was measured working anyway (T 2.41px, W 1.05px on the real
+essay) — see `sass/_links.scss`.
 
 ### Integration findings
 
@@ -456,7 +462,7 @@ templates/
   base.html            single base
   index.html  section.html  page.html
   taxonomy_list.html  taxonomy_single.html
-  shortcodes/{admonition,collapse,marginnote}.html
+  shortcodes/{admonition,collapse,marginnote}.html  (shipped as Tera components — Zola 0.23 removed shortcodes)
 data/
   annotations.toml     external-link annotations for popups
   thunder-paths.json   headline outline deltas (7 KB)
@@ -530,15 +536,15 @@ Without JS, links are just links.
 
 ## 13. What works without JS
 
-|                                                                                      |                                                         |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| Typography, palette, measure, justification, drop caps, small caps, oldstyle figures | pure CSS                                                |
-| Floated TOC                                                                          | Zola-generated + CSS                                    |
-| Collapsible sections                                                                 | native `<details>`/`<summary>`                          |
-| Admonition boxes                                                                     | shortcode + CSS                                         |
-| Dark mode following the OS                                                           | `prefers-color-scheme`; only the manual toggle needs JS |
-| Sidenotes                                                                            | degrade to footnotes                                    |
-| Knuth–Plass, optical margins, popups, headline animation                             | degrade to native rendering / plain links               |
+|                                                                                      |                                                                          |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Typography, palette, measure, justification, drop caps, small caps, oldstyle figures | pure CSS                                                                 |
+| Floated TOC                                                                          | Zola-generated + CSS                                                     |
+| Collapsible sections                                                                 | native `<details>`/`<summary>`                                           |
+| Admonition boxes                                                                     | Tera component (planning-era "shortcode"; Zola 0.23 removed those) + CSS |
+| Dark mode following the OS                                                           | `prefers-color-scheme`; only the manual toggle needs JS                  |
+| Sidenotes                                                                            | degrade to footnotes                                                     |
+| Knuth–Plass, optical margins, popups, headline animation                             | degrade to native rendering / plain links                                |
 
 ## 14. Verification
 

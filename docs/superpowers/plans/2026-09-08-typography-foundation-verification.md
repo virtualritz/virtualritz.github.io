@@ -36,28 +36,33 @@ The underlying weakness is real but minor, and is recorded as FAIL 4.
 
 ## Step 1 — automated checks
 
-`just check` **fails**, but not on anything this plan built. Broken down:
+At the time of this sweep, `just check` **failed**, but not on anything this
+plan built — see the now-fixed `justfile:19` finding below; `just check` runs
+`zola check --skip-external-links` since that fix and passes. Broken down as
+it stood at the time:
 
-| Check                                             | Result                                                          |
-| ------------------------------------------------- | --------------------------------------------------------------- |
-| `just fonts` regenerates identically              | **PASS** — clean `git status` afterwards, byte-identical        |
-| `zola build`                                      | **PASS** — clean                                                |
-| `npm test`                                        | **PASS** — 80/80, output pristine                               |
-| `zola check --skip-external-links` (what CI runs) | **PASS** — 4 pages, 2 sections, 0 orphans, no internal breakage |
-| `zola check` (what `just check` runs)             | **FAIL** — 72 external-link complaints                          |
+| Check                                             | Result                                                                                                                                |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `just fonts` regenerates identically              | **PASS** — clean `git status` afterwards, byte-identical                                                                              |
+| `zola build`                                      | **PASS** — clean                                                                                                                      |
+| `npm test`                                        | **PASS** — 80/80 at the time this sweep ran (now 87+; see the fix-wave note below)                                                    |
+| `zola check --skip-external-links` (what CI runs) | **PASS** — 4 pages, 2 sections, 0 orphans, no internal breakage                                                                       |
+| `zola check` (what `just check` ran at the time)  | **FAIL** — 72 external-link complaints (`just check` now runs `zola check --skip-external-links`, same as CI — see the Finding below) |
 
 All 72 are third-party: GitLab anchor checks (`#L30`-style deep links into
 source files, where GitLab does not serve the anchor to a bot) and 403s from
 `projects.blender.org`. They are all in `content/essays/nsi-vs-hydra-vs-riley.md`,
 which carries 399 external references.
 
-**Finding (minor, real):** `justfile:18` labels the `check` recipe
-"Everything CI runs", but line 19 runs bare `zola check` while
+**Finding (minor, real) — FIXED:** `justfile:18` labelled the `check` recipe
+"Everything CI runs", but line 19 ran bare `zola check` while
 `.github/workflows/deploy.yml` runs `zola check --skip-external-links`, with
 a comment explaining that CI must not depend on other people's uptime. The
-local target is therefore both stricter than CI and permanently red, which
-trains you to ignore it. Line 19 should carry `--skip-external-links` to
-match its own description.
+local target was therefore both stricter than CI and permanently red, which
+trains you to ignore it. Line 19 now carries `--skip-external-links`, and the
+comment above `check` notes that it also runs `fonts`, which CI does not —
+`just check` is no longer permanently red, and the "Result" row above is
+current as of that fix.
 
 ## Step 2 — the no-JS path
 
@@ -107,13 +112,13 @@ document, which recorded this as a failure.
 
 ## Failures
 
-### FAIL 1 — the drop cap destroys justification on the paragraph it decorates
+### ~~FAIL 1 — the drop cap destroys justification on the paragraph it decorates~~ — RESOLVED
 
-**Load-bearing.**
+**Was load-bearing; fixed by commits `0e68bf7`, `09468b0`, `b28cd62`.**
 
-With the tab painting, justified targets drop from 15/15 to 9/15 as soon as
-`dropcaps.js` runs. Re-running `justify()` with a capturing `onSkip` gives
-the reason explicitly:
+With the tab painting, justified targets dropped from 15/15 to 9/15 as soon as
+`dropcaps.js` ran. Re-running `justify()` with a capturing `onSkip` gave the
+reason explicitly:
 
 ```
 p (div.article-body), width 895
@@ -121,18 +126,39 @@ p (div.article-body), width 895
   reason: "floated element is not a leading direct child"
 ```
 
-So the opening paragraph of **every** essay silently falls back to native CSS
+So the opening paragraph of **every** essay silently fell back to native CSS
 justification, losing both Knuth–Plass line-breaking and optical margins — on
 the one paragraph a reader looks at first, and the one carrying the drop cap
 that is supposed to showcase the typography.
 
-Task 8 (justification) and Task 9 (drop caps) are mutually incompatible as
-built. Nothing in the 80-test suite catches it because no test executes this
-path in a browser.
+At the time this was recorded, the remedy looked like a design decision
+rather than a defect fix: either restructure the drop-cap markup so the
+floated element is a leading direct child of the paragraph, or abandon the
+float for a different placement technique. It turned out to be three
+ordinary defects, not a design conflict:
 
-The remedy is a design decision, not a defect fix: either restructure the
-drop-cap markup so the floated element is a leading direct child of the
-paragraph, or abandon the float for a different placement technique.
+1. `0e68bf7` — `p.prepend(sr)` (the screen-reader span) ran after
+   `p.prepend(box)` and reinserted `.sr` ahead of `.dropcap-box`, demoting
+   the box to the paragraph's second child. justif requires the floated
+   element to be the leading direct child.
+2. `09468b0` — justif has no second pass: `typography.js` was calling
+   `justify()` before the drop cap was placed, so inserting the cap
+   afterwards invalidated the first paragraph's already-computed layout.
+   `run()` now awaits `dropcaps.js`'s `capPlaced` (and `toc-move.js`'s
+   `tocMoved`) before ever calling `justify()` — see the ordering invariant
+   documented in both files' headers.
+3. `b28cd62` — the floated `#toc`, rendered as a preceding sibling of
+   `.article-body`, still intruded into the first paragraph's box even
+   after (1) and (2). Moving the TOC to a _following_ sibling of the first
+   paragraph (still `float: left`) removed it from that paragraph's box
+   entirely.
+
+Verified in a browser on the real essay: **279/279 paragraphs justified**,
+cap and TOC flush at offset 0, protrusion T 2.41px / W 1.05px. Task 8 and
+Task 9 are not mutually incompatible; the browser-only failure mode is now
+also caught at the source level by `tests/dropcap.test.mjs`'s DOM-order and
+sequencing pins, since no DOM is available under `node --test` to execute
+the path directly.
 
 ### ~~FAIL 2 — optical-margin protrusion not observed~~ — RETRACTED, this was a measurement error
 
@@ -192,12 +218,24 @@ justif being active, never demonstrated. It is demonstrated now, here.
 
 ### FAIL 3 — `justifSkipped` telemetry under-reports
 
-In the painting state, 6 of 15 targets lacked justif's `data-justif`
-attribute while `dataset.justifSkipped` reported only `2`.
+**Update:** this was recorded while FAIL 1 was still open. At the time, 6 of
+15 targets lacked justif's `data-justif` attribute while
+`dataset.justifSkipped` reported only `2` — a 4-element gap, all of them
+paragraphs FAIL 1 was silently falling back to native justification without
+`onSkip` ever seeing them (justif's decline path only fires for elements it
+actually evaluates and rejects, not for ones a caller-side layout bug pushes
+out of its view entirely).
+
+Now that FAIL 1 is resolved, the real essay reports **279/279 justified,
+skips at 2** — the same 2 as before, both correct and harmless (see below) —
+with no gap left between the declined count and the unjustified count. The
+under-report was a symptom of FAIL 1, not an independent defect in `onSkip`
+itself; it is no longer observable.
 
 Task 8's ruling installed `onSkip` specifically so that spec §14.8 ("no
-`.spec` paragraph is declined") would be falsifiable. A count that misses two
-thirds of the unjustified elements cannot support that check.
+`.spec` paragraph is declined") would be falsifiable. A count that missed two
+thirds of the unjustified elements could not support that check; a count
+that now matches the unjustified elements exactly can.
 
 Of the elements justif _does_ report declining, two are the footnote `<li>`s
 inside the clip-hidden native footnote section, with reason

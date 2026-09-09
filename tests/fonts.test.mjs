@@ -28,9 +28,13 @@ test("EB Garamond keeps the features we rely on", () => {
 
 test("subsets carry the space repertoire the punctuation pass needs", () => {
   const m = manifest();
+  const roman = m.faces.find(
+    (f) => f.family === "EB Garamond" && f.style === "normal",
+  );
+  const metricsKey = roman.file.replace(".woff2", "");
   for (const cp of ["0x2009", "0x2014", "0x2013"]) {
     assert.ok(
-      m.metrics["EB Garamond"].spaces[cp] != null,
+      m.metrics[metricsKey].spaces[cp] != null,
       `EB Garamond subset lacks ${cp}`,
     );
   }

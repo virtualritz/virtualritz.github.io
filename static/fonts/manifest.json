@@ -238,7 +238,7 @@
   }
  ],
  "metrics": {
-  "EB Garamond": {
+  "EBGaramond-normal-400": {
    "upem": 1000,
    "xem": 0.4,
    "capem": 0.65,
@@ -251,7 +251,7 @@
     "0x2008": 0.228
    }
   },
-  "EB Garamond Italic": {
+  "EBGaramond-italic-400": {
    "upem": 1000,
    "xem": 0.4,
    "capem": 0.65,
@@ -264,7 +264,20 @@
     "0x2008": 0.207
    }
   },
-  "Source Sans 3": {
+  "SourceSans3-normal-400": {
+   "upem": 1000,
+   "xem": 0.486,
+   "capem": 0.66,
+   "spaces": {
+    "0x2009": 0.1,
+    "0x200a": 0.02,
+    "0x2013": 0.48,
+    "0x2014": 0.8,
+    "0x2007": 0.497,
+    "0x2008": null
+   }
+  },
+  "SourceSans3-normal-600": {
    "upem": 1000,
    "xem": 0.491,
    "capem": 0.66,
@@ -277,7 +290,7 @@
     "0x2008": null
    }
   },
-  "IBM Plex Mono": {
+  "IBMPlexMono-normal-400": {
    "upem": 1000,
    "xem": 0.516,
    "capem": 0.698,
@@ -290,7 +303,7 @@
     "0x2008": 0.6
    }
   },
-  "IM Fell English": {
+  "IMFellEnglish-normal-400": {
    "upem": 2048,
    "xem": 0.4697,
    "capem": 0.6919,

@@ -6,7 +6,7 @@ webfonts strip most OpenType features; we need smcp, pcap, dlig and the
 italic swashes. Thunder is copied verbatim: its EULA forbids modifying
 the files, and the vendor already ships WOFF2.
 """
-import base64, json, os, shutil, subprocess, sys, zipfile, urllib.request
+import hashlib, json, os, shutil, subprocess, sys, zipfile, urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,7 +39,9 @@ SPACE_CPS = [0x2009, 0x200A, 0x2013, 0x2014, 0x2007, 0x2008]
 
 def fetch(url: str) -> Path:
     CACHE.mkdir(parents=True, exist_ok=True)
-    dest = CACHE / url.rsplit("/", 1)[-1]
+    basename = url.rsplit("/", 1)[-1]
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+    dest = CACHE / f"{url_hash}-{basename}"
     if not dest.exists():
         print(f"  fetch {dest.name}")
         urllib.request.urlretrieve(url, dest)
@@ -47,11 +49,12 @@ def fetch(url: str) -> Path:
 
 
 def subset(src: Path, out: Path) -> None:
-    subprocess.run([sys.executable, "-m", "fontTools.subset", str(src),
-                    f"--unicodes={SUBSET}", "--layout-features=*",
-                    "--flavor=woff2", "--no-hinting", "--desubroutinize",
-                    f"--output-file={out}"], check=True,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    result = subprocess.run([sys.executable, "-m", "fontTools.subset", str(src),
+                             f"--unicodes={SUBSET}", "--layout-features=*",
+                             "--flavor=woff2", "--no-hinting", "--desubroutinize",
+                             f"--output-file={out}"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"fontTools.subset failed for {src}:\n{result.stderr}")
 
 
 def audit(path: Path) -> dict:
@@ -108,7 +111,7 @@ def main() -> None:
         faces.append({"family": family, "style": style, "weight": weight,
                       "file": slug, "unmodified": False,
                       "features": info["features"]})
-        key = family if style == "normal" else f"{family} Italic"
+        key = slug.replace(".woff2", "")
         metrics[key] = {k: info[k] for k in ("upem", "xem", "capem", "spaces")}
         print(f"  {slug}  {(OUT / slug).stat().st_size // 1024} KiB")
     thunder(faces)

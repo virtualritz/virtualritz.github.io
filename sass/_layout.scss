@@ -1,1 +1,91 @@
-// filled in by a later task
+main {
+  max-width: 935px;
+  margin: 0 auto;
+  padding: 20px 20px 25px;
+  position: relative;
+}
+
+// gwern floats the TOC at the top-left of the article body. Putting it in
+// a page sidebar was the previous attempt's layout error.
+#toc {
+  float: left;
+  max-width: 285px;
+  margin: 0 45px 20px 0;
+  padding: 12.5px 15px 15px;
+  background: var(--box);
+  border: 0.8px solid var(--rule);
+  font-family: var(--sans);
+  font-size: 0.58em;
+  line-height: 1.25;
+
+  h2 {
+    font-size: 1em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin: 0 0 0.6em;
+    border: 0;
+    padding: 0;
+  }
+
+  ol {
+    list-style: none;
+    counter-reset: toc;
+    margin: 0;
+    padding: 0;
+
+    li {
+      counter-increment: toc;
+      margin-bottom: 0.3em;
+
+      &::before {
+        content: counters(toc, ".") "  ";
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+    }
+    ol {
+      padding-left: 0.9em;
+      margin-top: 0.3em;
+    }
+  }
+
+  @media (max-width: 700px) {
+    float: none;
+    max-width: none;
+    margin: 0 0 1.6em;
+  }
+}
+
+// Sidenote columns sit outside the measure and only appear when there is
+// genuinely room. Below this, the native footnote section is the fallback.
+#sidenote-column-left,
+#sidenote-column-right {
+  display: none;
+}
+
+@media (min-width: 1400px) {
+  #sidenote-column-left,
+  #sidenote-column-right {
+    display: block;
+    position: absolute;
+    top: 0;
+    width: 260px;
+  }
+  #sidenote-column-left {
+    right: calc(100% + 30px);
+  }
+  #sidenote-column-right {
+    left: calc(100% + 30px);
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --body-size: 20px;
+    --indent: 1.6em;
+  }
+  main {
+    padding: 16px 16px 20px;
+  }
+}

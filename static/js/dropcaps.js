@@ -16,29 +16,6 @@
  * line breaks) — so placing it first is safe. It still needs a real
  * layout box first, same as justif: computed font-size/line-height are
  * unreliable before styles have applied.
- *
- * Must also run *after* toc-move.js's phase 1 detach (`tocDetached`,
- * awaited below) — see that file's header comment for the full three-
- * phase design and why. In short: `#toc` is a preceding-sibling float
- * that intrudes into whatever paragraph follows it in DOM order, so
- * measuring a candidate paragraph's fit while `#toc` is still in its
- * template position (still floated left, ahead of `.article-body`)
- * measures a squeezed, artificially-shorter layout — a cap that looks
- * like it fits there can overhang once `#toc` actually moves away and the
- * paragraph reflows back to its true height (measured: a 2-line paragraph
- * against a 3-line cap, 38px/a full line of overhang). Awaiting
- * `tocDetached` first guarantees every measurement below happens against
- * clean, TOC-free layout, so the candidate loop's own place-measure-undo
- * check (`tryPlaceCap`) is judging the paragraph's real, final height.
- *
- * toc-move.js's *re-insertion* (phase 3) runs the other way around: it
- * awaits this file's `capPlaced` to learn which paragraph to anchor `#toc`
- * after, not always the first one (see toc-move.js's header comment and
- * dropcap-candidates.js). That, plus this file awaiting `tocDetached`,
- * makes the two files import each other — see toc-move.js's header
- * comment for why that's a real ES-module cycle but not a circular data
- * dependency, and why `capPlaced` below defers its read of `tocDetached`
- * to a microtask rather than reading it inline.
  */
 import { waitForBox } from "./lib/wait-for-box.js";
 import {
@@ -48,11 +25,6 @@ import {
   solveWeight,
   stripLetter,
 } from "./lib/dropcap-geometry.js";
-import {
-  MAX_DROPCAP_CANDIDATES,
-  selectDropcapCandidates,
-} from "./lib/dropcap-candidates.js";
-import { tocDetached } from "./toc-move.js";
 
 const LINES = 3;
 const CAP_DROP_PCT = 3;
@@ -107,18 +79,112 @@ function stemRatio(family, ch, weight) {
   return best / px;
 }
 
-/**
- * Try to place a cap on one candidate paragraph and measure whether it
- * actually fits. Returns true and leaves the cap in place if it does;
- * returns false and leaves `p` exactly as found (see the undo comment
- * below) if it overhangs or has no ink to cap at all.
- */
-function tryPlaceCap(p, letter, opts, initial, weight) {
+async function place(article) {
+  const p = article.querySelector(".article-body > p");
+  if (!p || p.querySelector(".dropcap-box")) return;
+
+  const text = p.textContent.trimStart();
+  const letter = text[0];
+  if (!letter || !/[A-Za-z]/.test(letter)) return;
+
+  const cs = getComputedStyle(article);
+  const bodySize = parseFloat(cs.fontSize);
+  const lineHeight = parseFloat(getComputedStyle(p).lineHeight) / bodySize;
+  const serif = cs
+    .getPropertyValue("--serif")
+    .split(",")[0]
+    .replace(/"/g, "")
+    .trim();
+  const initial = cs
+    .getPropertyValue("--initial")
+    .split(",")[0]
+    .replace(/"/g, "")
+    .trim();
+
+  // document.fonts.ready only settles for fonts the page has already
+  // requested. Neither face here qualifies: --initial is consumed only
+  // by .dropcap (which this function creates), and there is no
+  // <link rel=preload>.
+  // So the first request for either face would otherwise be our own
+  // measureText calls below, which return fallback-font metrics
+  // synchronously on that first call — and a fallback glyph's ink is
+  // still positive, so capGeometry's `inkAsc > 0` guard can't catch it.
+  // Ask for both explicitly and wait. A rejected load (missing/blocked
+  // font) degrades to the fallback already in the --serif/--initial
+  // stack rather than throwing.
+  //
+  // Race against a timeout: FontFaceSet#load's promise can stay pending
+  // indefinitely (a stalled request neither resolves nor rejects), and
+  // the try/catch above only ever catches a *rejection*. A pending
+  // promise here would hang capPlaced, which typography.js awaits before
+  // calling justify() — silently disabling justification, protrusion,
+  // drop caps and sidenotes together. Falling through to the timeout
+  // measures whatever face is loaded so far, same as the catch below.
+  const FONT_LOAD_TIMEOUT_MS = 2000;
+  try {
+    await Promise.race([
+      Promise.all([
+        document.fonts.load(`${REF}px "${initial}"`, letter),
+        document.fonts.load(`${REF}px "${serif}"`, "Hl"),
+      ]),
+      new Promise((resolve) => setTimeout(resolve, FONT_LOAD_TIMEOUT_MS)),
+    ]);
+  } catch {
+    // fall through — measurement reflects whichever face is available
+  }
+
+  const bodyH = inkRatios(serif, "H");
+  const bodyMetrics = {
+    fbAsc: bodyH.fbAsc,
+    fbDesc: bodyH.fbDesc,
+    capInk: bodyH.inkAsc,
+  };
+  const bodyStemPx = stemRatio(serif, "l") * bodySize;
+
+  const opts = {
+    bodyMetrics,
+    bodySize,
+    lineHeight,
+    lines: LINES,
+    fit: "ink",
+    capDropPct: CAP_DROP_PCT,
+    growPct: GROW_PCT,
+  };
+
+  // a variable initial gets its weight solved for the stroke ratio; size
+  // barely moves with weight, so one probe pass is enough
+  let weight = 0;
+  const variable = initial === "Thunder VF";
+  if (variable && bodyStemPx > 0) {
+    const probe = capGeometry({
+      ...opts,
+      glyphMetrics: inkRatios(initial, letter, 400),
+    });
+    if (probe) {
+      // Stroke weight is a property of the face, not of the letter being
+      // set. Probe "I" — a clean vertical at any weight — rather than the
+      // actual initial: a diagonal (A, V, W) or a bowl (O, Q) crosses the
+      // scan row wider than its true perpendicular thickness, which would
+      // read as a heavier stem than it is and make solveWeight land on a
+      // weight that's too light. The body side already probes "l" for the
+      // same reason. Fall back to the initial letter if "I" has no ink
+      // (unlikely, but avoids handing solveWeight a stem that's always
+      // zero).
+      const stemGlyph = stemRatio(initial, "I", 400) > 0 ? "I" : letter;
+      weight = solveWeight(
+        (w) => stemRatio(initial, stemGlyph, w),
+        bodyStemPx,
+        STROKE_RATIO,
+        probe.size,
+      );
+    }
+  }
+
   const g = capGeometry({
     ...opts,
     glyphMetrics: inkRatios(initial, letter, weight || 0),
   });
-  if (!g) return false;
+  if (!g) return;
 
   // strip the letter from the flow and float a sized box in its place.
   // The letter isn't always in the paragraph's very first text node —
@@ -144,7 +210,7 @@ function tryPlaceCap(p, letter, opts, initial, weight) {
 
   const box = document.createElement("span");
   box.className = "dropcap-box";
-  box.style.width = `${g.inkRight + opts.bodySize * 0.7}px`;
+  box.style.width = `${g.inkRight + bodySize * 0.7}px`;
   box.style.height = `${g.lines * g.lineHeightPx}px`;
 
   const glyph = document.createElement("span");
@@ -185,173 +251,21 @@ function tryPlaceCap(p, letter, opts, initial, weight) {
   if (overhangs) {
     // Undo completely, leaving the paragraph exactly as found. A
     // half-removed cap — box gone but the initial letter still missing —
-    // is worse than either placing the cap or skipping it outright. This
-    // must hold no matter how many earlier candidates were already tried
-    // and rejected: each rejection restores its own paragraph fully
-    // before the next candidate is ever touched, so rejections never
-    // compound.
+    // is worse than either placing the cap or skipping it outright.
     box.remove();
     sr.remove();
     node.data = restoreLetter(node.data, letter, stripped.index);
-    return false;
   }
-  return true;
-}
-
-async function place(article) {
-  const container = article.querySelector(".article-body");
-  if (!container) return null;
-  // Idempotent: a second call (e.g. from a test) reports the same host
-  // rather than silently doing nothing.
-  const existingBox = container.querySelector(".dropcap-box");
-  if (existingBox) return existingBox.parentElement;
-
-  const children = Array.from(container.children);
-  const candidateIdx = selectDropcapCandidates(
-    children.map((el) => el.tagName),
-    MAX_DROPCAP_CANDIDATES,
-  );
-
-  // Each candidate's own first letter, decided up front (text content
-  // isn't touched until a candidate is actually attempted, so reading it
-  // now is safe for every candidate, not just the first).
-  const candidates = candidateIdx
-    .map((i) => children[i])
-    .map((p) => ({ p, letter: p.textContent.trimStart()[0] }))
-    .filter(({ letter }) => letter && /[A-Za-z]/.test(letter));
-  if (candidates.length === 0) return null;
-
-  const cs = getComputedStyle(article);
-  const bodySize = parseFloat(cs.fontSize);
-  const serif = cs
-    .getPropertyValue("--serif")
-    .split(",")[0]
-    .replace(/"/g, "")
-    .trim();
-  const initial = cs
-    .getPropertyValue("--initial")
-    .split(",")[0]
-    .replace(/"/g, "")
-    .trim();
-
-  // document.fonts.ready only settles for fonts the page has already
-  // requested. Neither face here qualifies: --initial is consumed only
-  // by .dropcap (which this function creates), and there is no
-  // <link rel=preload>.
-  // So the first request for either face would otherwise be our own
-  // measureText calls below, which return fallback-font metrics
-  // synchronously on that first call — and a fallback glyph's ink is
-  // still positive, so capGeometry's `inkAsc > 0` guard can't catch it.
-  // Ask for both explicitly and wait. A rejected load (missing/blocked
-  // font) degrades to the fallback already in the --serif/--initial
-  // stack rather than throwing.
-  //
-  // Race against a timeout: FontFaceSet#load's promise can stay pending
-  // indefinitely (a stalled request neither resolves nor rejects), and
-  // the try/catch above only ever catches a *rejection*. A pending
-  // promise here would hang capPlaced, which typography.js awaits before
-  // calling justify() — silently disabling justification, protrusion,
-  // drop caps and sidenotes together. Falling through to the timeout
-  // measures whatever face is loaded so far, same as the catch below.
-  //
-  // Done exactly once, for every candidate together, not once per
-  // candidate: this await is already raced against a fixed timeout
-  // precisely because a stalled font request can hang capPlaced, and
-  // repeating it per candidate would let a slow/blocked font multiply
-  // that budget by up to MAX_DROPCAP_CANDIDATES. Passing every
-  // candidate's letter as the load's text covers unicode-range
-  // subsetting for whichever paragraph ends up hosting the cap.
-  const letters = [...new Set(candidates.map((c) => c.letter))].join("");
-  const FONT_LOAD_TIMEOUT_MS = 2000;
-  try {
-    await Promise.race([
-      Promise.all([
-        document.fonts.load(`${REF}px "${initial}"`, letters),
-        document.fonts.load(`${REF}px "${serif}"`, "Hl"),
-      ]),
-      new Promise((resolve) => setTimeout(resolve, FONT_LOAD_TIMEOUT_MS)),
-    ]);
-  } catch {
-    // fall through — measurement reflects whichever face is available
-  }
-
-  const bodyH = inkRatios(serif, "H");
-  const bodyMetrics = {
-    fbAsc: bodyH.fbAsc,
-    fbDesc: bodyH.fbDesc,
-    capInk: bodyH.inkAsc,
-  };
-  const bodyStemPx = stemRatio(serif, "l") * bodySize;
-  const variable = initial === "Thunder VF";
-
-  for (const { p, letter } of candidates) {
-    const lineHeight = parseFloat(getComputedStyle(p).lineHeight) / bodySize;
-    const opts = {
-      bodyMetrics,
-      bodySize,
-      lineHeight,
-      lines: LINES,
-      fit: "ink",
-      capDropPct: CAP_DROP_PCT,
-      growPct: GROW_PCT,
-    };
-
-    // a variable initial gets its weight solved for the stroke ratio; size
-    // barely moves with weight, so one probe pass is enough
-    let weight = 0;
-    if (variable && bodyStemPx > 0) {
-      const probe = capGeometry({
-        ...opts,
-        glyphMetrics: inkRatios(initial, letter, 400),
-      });
-      if (probe) {
-        // Stroke weight is a property of the face, not of the letter being
-        // set. Probe "I" — a clean vertical at any weight — rather than the
-        // actual initial: a diagonal (A, V, W) or a bowl (O, Q) crosses the
-        // scan row wider than its true perpendicular thickness, which would
-        // read as a heavier stem than it is and make solveWeight land on a
-        // weight that's too light. The body side already probes "l" for the
-        // same reason. Fall back to the initial letter if "I" has no ink
-        // (unlikely, but avoids handing solveWeight a stem that's always
-        // zero).
-        const stemGlyph = stemRatio(initial, "I", 400) > 0 ? "I" : letter;
-        weight = solveWeight(
-          (w) => stemRatio(initial, stemGlyph, w),
-          bodyStemPx,
-          STROKE_RATIO,
-          probe.size,
-        );
-      }
-    }
-
-    if (tryPlaceCap(p, letter, opts, initial, weight)) return p;
-  }
-  return null;
 }
 
 const article = document.querySelector("#article.essay");
 
 // typography.js imports and awaits this before calling justify() — see the
-// ordering invariant in both files' header comments. toc-move.js also
-// awaits it, to learn which paragraph the TOC must land after — see its
-// header comment. Resolves with the paragraph that actually received the
-// cap, or `null` when none did (a short opening paragraph with no
-// eligible candidate, or any non-essay page). Must always resolve (never
-// reject/hang): a stuck promise here would silently disable
-// justification, drop caps, TOC placement and sidenotes together. place()
-// does its own explicit font loading (document.fonts.ready doesn't cover
-// faces nothing else on the page has requested yet — see the comment
-// above).
-//
-// Reads `tocDetached` from inside the first `.then()`, not inline in this
-// ternary, so the read happens on a microtask rather than during this
-// module's own synchronous evaluation — see toc-move.js's header comment
-// on why the two files' mutual import needs that deferral on at least one
-// side, and why doing it on both sides makes this safe regardless of
-// which of the two files ES modules happen to evaluate first.
+// ordering invariant in both files' header comments. Must always resolve
+// (never reject/hang): a stuck promise here would silently disable
+// justification, drop caps and sidenotes together. place() does its own
+// explicit font loading (document.fonts.ready doesn't cover faces nothing
+// else on the page has requested yet — see the comment above).
 export const capPlaced = article
-  ? Promise.resolve()
-      .then(() => tocDetached)
-      .then(() => waitForBox(".article-body > p"))
-      .then((found) => (found ? place(article) : null))
-  : Promise.resolve(null);
+  ? waitForBox(".article-body > p").then((found) => found && place(article))
+  : Promise.resolve();

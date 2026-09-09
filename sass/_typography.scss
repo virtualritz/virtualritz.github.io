@@ -103,6 +103,18 @@
     background: var(--box);
     padding: 0.08em 0.24em;
     border-radius: 2px;
+    // justif sets overflow-wrap:normal on the paragraph itself (an
+    // !important inline style — see typography.js/justif's
+    // maskAuthorStyle) so its own line-breaking measurements aren't
+    // second-guessed by the browser. That's only inherited, though: a
+    // property set directly on `code` here — plain author-stylesheet
+    // specificity, no !important needed — wins over an inherited value
+    // regardless of how the ancestor's own value was set. Without this,
+    // a long unbroken inline code token (a file path, an identifier) can
+    // punch out of the column and force the whole page to scroll
+    // sideways, since justif won't break it and the browser, left to its
+    // inherited "normal", won't either.
+    overflow-wrap: anywhere;
   }
 
   pre {
@@ -120,6 +132,10 @@
       background: none;
       padding: 0;
       font-size: inherit;
+      // pre is its own scroll container (overflow-x: auto above); unlike
+      // a bare inline <code>, breaking a long token here mid-word would
+      // just make code samples harder to read for no overflow benefit.
+      overflow-wrap: normal;
     }
   }
 

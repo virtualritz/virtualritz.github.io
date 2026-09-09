@@ -204,3 +204,49 @@ test("a synchronous throw in run() still resolves `ready`, and so does every ear
     );
   }
 });
+
+// Pull out the options object literal passed to justify(targets, { ... })
+// by structure, so reordering/reformatting the call doesn't break these.
+function justifyOptionsText() {
+  const src = readFileSync(root + "static/js/typography.js", "utf8");
+  const anchor = src.indexOf("controller = justify(targets, ");
+  assert.ok(anchor !== -1, "expected the justify(targets, {...}) call");
+  const obj = extractBalanced(src, anchor, "{");
+  assert.ok(obj, "could not find the balanced options object");
+  return obj.text;
+}
+
+test("the ellipsis gets a partial protrusion code, not a full hang", () => {
+  const opts = justifyOptionsText();
+  // "…" must carry its own protrusion entry with a numeric `r` code
+  // strictly between 0 (the current, reported bug: no protrusion at
+  // all) and 1000 (justif's HANG code, which hangs the character's
+  // entire — for "…", visually wide — advance width past the margin).
+  const m = opts.match(/["'`]…["'`]\s*:\s*\{[^}]*\br:\s*(\d+)/);
+  assert.ok(m, "expected an options.protrusion entry for the ellipsis");
+  const code = Number(m[1]);
+  assert.ok(
+    code > 0 && code < 1000,
+    `ellipsis protrusion code ${code} must be a partial hang (0 < r < 1000), not zero or a full HANG`,
+  );
+});
+
+test("the ellipsis is not added to hangingPunctuation's hanging character set", () => {
+  const opts = justifyOptionsText();
+  // hangingPunctuation must stay the plain "line-end-only" string, not
+  // an object with a widened `characters.end` — a full HANG code for a
+  // character this wide (see the test above) would push it noticeably
+  // into the margin, which is exactly what the partial protrusion code
+  // is meant to avoid.
+  assert.match(opts, /hangingPunctuation:\s*["'`]line-end-only["'`]/);
+});
+
+test("hyphens still fully occupy the base latinProtrusion table (colon/semicolon/!/? are not widened into a hang)", () => {
+  const opts = justifyOptionsText();
+  // Fix 2 deliberately leaves ":", ";", "!", "?" out of any widened
+  // hanging-character set — justif's own default already excludes them
+  // from hangingCharacters.end while still giving them base protrusion
+  // codes. This just guards against someone later "completing the set"
+  // by literally handing hangingPunctuation a characters object.
+  assert.doesNotMatch(opts, /hangingPunctuation:\s*\{/);
+});

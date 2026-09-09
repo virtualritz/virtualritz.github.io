@@ -57,6 +57,25 @@ test("nested strong (`****foo****`) gets small caps with the bold reset", async 
   assert.match(rule, /font-weight:\s*normal/);
 });
 
+test("inline code wraps instead of overflowing the column", async () => {
+  const c = await css();
+  // A long unbroken token (a file path, an identifier) in inline <code>
+  // would otherwise punch out of the column and force the whole page to
+  // scroll sideways, because justif sets overflow-wrap:normal on the
+  // paragraph (see typography.js) and that's what code would otherwise
+  // inherit.
+  const rule = c.match(
+    /\.article-body code,\.article-body kbd,\.article-body samp\{([^}]*)\}/,
+  )[1];
+  assert.match(rule, /overflow-wrap:\s*anywhere/);
+});
+
+test("code inside <pre> keeps overflow-wrap normal (pre has its own scroll container)", async () => {
+  const c = await css();
+  const rule = c.match(/\.article-body pre code\{([^}]*)\}/)[1];
+  assert.match(rule, /overflow-wrap:\s*normal/);
+});
+
 test("the essay renders its title once, from frontmatter", async () => {
   const html = (await buildSite()).read(
     "essays/nsi-vs-hydra-vs-riley/index.html",

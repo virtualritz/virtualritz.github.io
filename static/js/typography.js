@@ -46,7 +46,7 @@
  * gives it that ordering: ES modules evaluate each import's top-level
  * body, in source order, before the importing module's own body runs.
  */
-import { justify } from "./lib/justif/index.js";
+import { justify, hangingCharacters } from "./lib/justif/index.js";
 import { hyphenateEnUS } from "./lib/justif/hyphenate/en-us.js";
 import { markPunctuation } from "./lib/punctuation.js";
 import { waitForBox } from "./lib/wait-for-box.js";
@@ -86,60 +86,57 @@ async function run() {
     const skipped = [];
     controller = justify(targets, {
       hyphenate: hyphenateEnUS,
-      // A plain `true` here would keep justif's live, canvas-measured
-      // per-font protrusion (chunk-WWMSGT6G.js's `opticalProtrusion`),
-      // which is more robust to font-fallback than the static tables
-      // (it measures whatever glyphs the browser actually rendered).
-      // But justif's public API only accepts a user protrusion table
-      // (below, to add the ellipsis) OR live measurement, never both —
-      // `resolveOptions` derives `measuredProtrusion` as exactly
-      // `options.protrusion === true || options.protrusion === void 0`
-      // (index.js ~4395), so any object here turns measurement off for
-      // every character, not just "…". The fallback it turns on instead
-      // is `{...latinProtrusion, ...fontProtrusion(family)}`
-      // (index.js's composedForFamily), and fontProtrusion resolves
-      // "eb garamond" (our --serif, see sass/_tokens.scss) to a
-      // hand-tuned microtype table (chunk-WWMSGT6G.js's TABLES /
-      // FAMILY_TO_TABLE) — a reasonable, still-curated fallback for the
-      // font we actually ship, so the trade is accepted rather than
-      // dodged. Worth reverting to `true` if a future body font isn't in
-      // FAMILY_TO_TABLE, or if live measurement turns out to matter more
-      // than this one character.
-      protrusion: {
-        // "…" (U+2026) is in neither latinProtrusion nor
-        // hangingCharacters, so it currently gets zero protrusion and
-        // never hangs. It is NOT added to hangingPunctuation's character
-        // set below: that set applies a full HANG code (1000 — the
-        // entire glyph's own advance width hangs past the margin), which
-        // suits quotes/periods/commas but would push a much wider mark
-        // like "…" noticeably into the margin. Instead it gets its own
-        // partial code here, sized like the existing stops: "." is r:700
-        // and an ellipsis glyph in a serif text face is roughly 2.5-3x
-        // as wide as a period (three dots plus the gaps between them,
-        // vs. one), so scaling 700 down by that width ratio keeps the
-        // absolute pixel overhang in the same range a hanging period
-        // produces (~700/2.8 ~ 250) rather than swallowing a visibly
-        // wider notch out of the column merely because the character
-        // itself is wider. No `l` code, matching every other single-
-        // sided stop in latinProtrusion (period, comma, colon,
-        // semicolon, !, ?) — none of them protrude on the left either.
-        "…": { r: 250 },
-      },
-      // line-end-only: only close, comma/period/quote-style punctuation
-      // fully hangs (hangingCharacters.end = quotes + ".," + CJK,
-      // chunk-WWMSGT6G.js). ":", ";", "!", "?" are deliberately excluded
-      // from that set upstream even though they DO have base protrusion
-      // codes (500/300/100/100) — i.e. justif already treats "gets some
+      // Keep justif's live, canvas-measured per-font protrusion
+      // (chunk-WWMSGT6G.js's `opticalProtrusion`) on. This is more
+      // robust to font-fallback than the static tables (it measures
+      // whatever glyphs the browser actually rendered, not whichever
+      // family name was first in the CSS list) — measured against the
+      // static `{...latinProtrusion, ...fontProtrusion(family)}`
+      // fallback on the demo page, "S" got 0.74px of measured protrusion
+      // vs. 0 from the static table, so this isn't a wash.
+      //
+      // Adding a character justif doesn't already know about (the
+      // ellipsis, below) looks like it needs a user protrusion table via
+      // this option — but passing `protrusion` anything other than
+      // `true`/`undefined` sets `resolveOptions`'s `measuredProtrusion`
+      // to `false` (index.js ~4395: `options.protrusion === void 0 ||
+      // options.protrusion === true`), which turns off live measurement
+      // for every character, not just the one being added. There's no
+      // option that supplies a user table and keeps measurement on.
+      protrusion: true,
+      // "…" (U+2026) hangs at a line end via hangingPunctuation's
+      // `characters` field instead, which resolves on a path independent
+      // of `protrusion` above: `resolveOptions` builds `hangChars` from
+      // `options.hangingPunctuation.characters` a few lines before it
+      // even looks at `options.protrusion`, and passes it straight into
+      // `composeProtrusion(..., hangMode, hangChars)`
+      // (chunk-WWMSGT6G.js's `classify(base, chars.end, "r", HANG)`) —
+      // so this reaches justif's hanging-character set without touching
+      // the protrusion model at all. `…` is in neither
+      // `latinProtrusion` nor the default `hangingCharacters`
+      // (chunk-WWMSGT6G.js: quotes + ".," + CJK), so it currently gets
+      // zero protrusion and never hangs; `edges: "line-end-only"`
+      // preserves the previous behaviour for everything already in that
+      // default set. Extending justif's own exported `hangingCharacters`
+      // rather than hand-copying its character list means this doesn't
+      // silently go stale if a future justif version changes that set.
+      //
+      // ":", ";", "!", "?" are deliberately NOT added here, even though
+      // they DO have base protrusion codes (500/300/100/100 via
+      // `protrusion: true` above) — i.e. justif already treats "gets an
       // optical nudge at a line edge" and "fully hangs past the margin"
-      // as different things, and reserves the latter for small, simple
-      // marks. A colon's two stacked dots, a semicolon's comma-tail, and
-      // the vertical stroke of "!"/"?" all read as more visually complex
+      // (this `characters.end` set: a HANG code, 1000 — the character's
+      // *entire* advance width hangs) as different things, reserving the
+      // latter for small, simple marks (quotes, period, comma). A
+      // colon's two stacked dots, a semicolon's comma-tail, and the
+      // vertical stroke of "!"/"?" all read as more visually complex
       // than a lone period or a round quote, so a full-width hang would
-      // leave a more conspicuous, disconnected-looking mark in the
-      // margin. That default already matches how this project treats
-      // "…" (partial protrusion, not a full hang), so it's left as-is
-      // rather than widened.
-      hangingPunctuation: "line-end-only",
+      // leave a more conspicuous, disconnected-looking mark sitting in
+      // the margin. Left as justif's default rather than widened.
+      hangingPunctuation: {
+        edges: "line-end-only",
+        characters: { end: hangingCharacters.end + "…" },
+      },
       onSkip: (p, reason) => skipped.push([describe(p), reason]),
     });
 

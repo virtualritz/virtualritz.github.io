@@ -295,3 +295,129 @@ Checking site... -> Site content: 4 pages (0 orphan), 2 sections. Done in 25ms.
   retune with `latinProtrusion`'s `.`/`,` entries as a reference.
 - Everything under "What needs a browser," above — visual/layout
   outcomes in general, per the task's constraint.
+
+## Addendum — Fix 2 reworked: the trade-off wasn't necessary
+
+The coordinator caught a mistake in the Fix 2 write-up above: I'd read
+`resolveOptions` far enough to see that `options.protrusion` as an
+object disables live-measured protrusion sitewide, but not far enough to
+notice that `hangingPunctuation.characters` is resolved on a completely
+independent path a few lines earlier in the same function:
+
+```js
+const hangChars =
+  hangObject?.characters === void 0
+    ? hangingCharacters
+    : {
+        start: hangObject.characters.start ?? hangingCharacters.start,
+        end: hangObject.characters.end ?? hangingCharacters.end,
+      };
+// ...
+const measuredProtrusion =
+  options.protrusion === void 0 || options.protrusion === true;
+const composed =
+  !protrusionModel && !hanging
+    ? null
+    : composeProtrusion(
+        protrusionModel ? latinProtrusion : {},
+        protrusionUser,
+        hangMode,
+        hangChars,
+      );
+```
+
+`hangChars` flows into `composeProtrusion`'s `classify(base, chars.end,
+"r", HANG)` regardless of what `protrusion` is set to — it never touches
+`protrusionUser`/`measuredProtrusion`. So the ellipsis can be added to
+the hanging-character set without ever constructing a `protrusion`
+object, and the measured-vs-static trade-off documented above didn't
+need to be made at all.
+
+**Reworked `static/js/typography.js`:**
+
+- `protrusion: true` restored (live canvas measurement back on
+  sitewide — the `{"…": {r:250}}` user table is gone).
+- `hangingPunctuation` changed from the plain string `"line-end-only"`
+  to `{ edges: "line-end-only", characters: { end: hangingCharacters.end
+  - "…" } }`, importing `hangingCharacters`from`./lib/justif/index.js` rather than hand-copying its character list
+(`quotes + ".," + CJK`) — so this doesn't quietly go stale if a future
+    justif version changes that default set.
+- Consequence I hadn't weighed the first time: `characters.end` only
+  ever produces a full `HANG` (1000) code via `classify` — there's no
+  way to give a character in that set a partial code the way the old
+  `protrusion` user-table entry could. So the ellipsis now gets a full,
+  100%-of-its-own-advance-width hang at line end, not the calibrated
+  partial `r: 250` from the first version. I flagged in the original
+  write-up that a full hang seemed disproportionate for a wide glyph;
+  that concern still stands as a visual judgment call I can't verify
+  myself — it's now in the coordinator's "will verify in the browser"
+  queue rather than something I designed around by (as it turned out,
+  needlessly) giving up live measurement.
+- Comments rewritten to explain the actual mechanism (independent
+  resolution paths) rather than the either/or I'd previously believed
+  applied everywhere in `resolveOptions`.
+- `:` `;` `!` `?` reasoning carried over unchanged, re-recorded against
+  the new mechanism: still not added to `characters.end`, for the same
+  reason (justif's own default already separates "gets an optical nudge"
+  from "fully hangs," reserving the latter for small, simple marks).
+
+**Tests reworked in `tests/justif.test.mjs`:**
+
+- `protrusion stays live-measured, not swapped for a static user table`
+  — replaces the old partial-protrusion-code test; asserts
+  `protrusion: true` is present and no `protrusion: {` object exists.
+- `the ellipsis is added to justif's own exported hanging-character set,
+not a hand-copied one` — replaces the old "not added to
+  hangingPunctuation" test (inverted, since the mechanism changed);
+  asserts both that `hangingCharacters` is imported from
+  `./lib/justif/index.js` (guards against a future hand-copy) and that
+  `hangingPunctuation` has the `{ edges, characters: { end:
+hangingCharacters.end + "…" } }` shape.
+- `hyphens still fully occupy the base latinProtrusion table
+(colon/semicolon/!/? are not widened into a hang)` — kept, re-targeted
+  at the new `characters.end` expression instead of a `hangingPunctuation:
+{` absence check.
+
+**Demonstrated teeth on all three reworked/new tests** (broke, watched
+fail, restored, reran green):
+
+- Reverted `protrusion: true` → `protrusion: { "…": { r: 250 } }` →
+  `protrusion stays live-measured...` failed: `AssertionError: a user
+protrusion table object would disable live measurement sitewide`.
+- Reverted `hangingPunctuation` to the plain string `"line-end-only"`
+  (dropping the ellipsis extension entirely) → both `the ellipsis is
+added to justif's own exported hanging-character set...` and `hyphens
+still fully occupy the base latinProtrusion table...` failed (no
+  `characters.end` match; "expected a characters.end extension").
+- Removed the `hangingCharacters` import and hand-copied its character
+  list inline instead → `the ellipsis is added to justif's own exported
+hanging-character set...` failed on the import-source assertion
+  specifically (`hangingCharacters` not imported from
+  `./lib/justif/index.js`).
+
+All three restores brought the suite back to green.
+
+**Re-verified after the rework:**
+
+```
+$ npm test
+# tests 125 / pass 125 / fail 0
+
+$ zola build --output-dir /tmp/zbuild-check3 --force
+Building site... -> Creating 4 pages (0 orphan) and 2 sections. Done in 33ms.
+
+$ zola check --skip-external-links
+Checking site... -> Site content: 4 pages (0 orphan), 2 sections. Done in 26ms.
+```
+
+**What I still could not confirm:** everything under "What needs a
+browser" above still applies (390px sweep, ellipsis hang appearance).
+One item is now different rather than resolved: since the ellipsis gets
+a full `HANG` (not the calibrated `r: 250`), please specifically check
+whether a full-width hang looks right for a glyph this wide, or reads as
+excessive — that's the coordinator's call to make visually, not
+something I could weigh from source alone. The "measured vs. static
+protrusion" comparison table in the coordinator's message is now moot
+for this change (protrusion stays live-measured, unchanged from before
+either fix), but worth keeping in mind if `protrusion` options are ever
+touched again here.

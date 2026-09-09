@@ -12,3 +12,7 @@
 
 # SDD scratch workspace
 /.superpowers/
+
+# node
+/node_modules/
+/tests/.out/

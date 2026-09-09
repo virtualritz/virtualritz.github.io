@@ -59,8 +59,10 @@ main {
 }
 
 // Sidenote columns sit outside the measure at 1560px minimum: the narrowest
-// viewport with room for a 260px column, a 30px gap, and the 935px main column
-// on each side (935 + 2×290 = 1515px, plus 22.5px slack per side = 1560px).
+// viewport with room for a 260px column, a 30px gap, and the article on
+// each side. The columns' containing block is #article (sass/_sidenotes.scss
+// positions it, not main — see that file for why), whose own width is
+// --measure, 895px: 895 + 2×290 = 1475px, plus ~42.5px slack per side = 1560px.
 // Below this, the native footnote section is the fallback.
 #sidenote-column-left,
 #sidenote-column-right {

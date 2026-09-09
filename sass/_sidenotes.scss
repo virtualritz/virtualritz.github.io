@@ -33,8 +33,23 @@
   margin-right: 0.4em;
 }
 
-// Zola's collected footnote list is the no-JS fallback; it is hidden only
-// once notes have actually been hoisted into the margins.
-.has-sidenotes .footnotes[hidden] {
-  display: none;
+// Zola's collected footnote list is the no-JS/narrow-viewport fallback.
+// Once notes have actually been hoisted into the margins (sidenotes.js
+// sets `has-sidenotes` only then), it is hidden visually rather than via
+// [hidden] or display:none: those would drop it from the accessibility
+// tree, deleting the footnote text from every accessible surface at once
+// (the sidenote columns duplicating it are aria-hidden), and would leave
+// every in-text [n] reference link pointing at a non-rendered target.
+// Same clip technique as .sr (sass/_dropcaps.scss): still present,
+// focusable and readable by assistive tech, just not painted.
+.has-sidenotes .footnotes {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
 }

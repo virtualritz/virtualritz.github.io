@@ -9,3 +9,6 @@
 /.claude/audit/
 # Claude Code worktrees and local state
 /.claude/worktrees/
+
+# SDD scratch workspace
+/.superpowers/

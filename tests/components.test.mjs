@@ -5,11 +5,21 @@ import { buildSite } from "./helpers/build.mjs";
 
 const root = new URL("../", import.meta.url).pathname;
 
-test("theme toggle runs before paint and survives a missing localStorage", () => {
+test("theme toggle survives a missing localStorage", () => {
   const src = readFileSync(root + "static/js/theme.js", "utf8");
   assert.match(src, /try\s*\{/, "localStorage throws in some contexts");
   assert.match(src, /data-theme/);
-  assert.ok(!src.includes("DOMContentLoaded"), "must run before first paint");
+});
+
+test("theme.js is loaded in <head> with no defer/async, so it runs before first paint", async () => {
+  const html = (await buildSite()).read("index.html");
+  const head = html.slice(0, html.indexOf("</head>"));
+  const scriptMatch = head.match(
+    /<script[^>]*src="[^"]*\/js\/theme\.js"[^>]*>/,
+  );
+  assert.ok(scriptMatch, "theme.js script tag not found in <head>");
+  assert.ok(!/\bdefer\b/.test(scriptMatch[0]), "must not be deferred");
+  assert.ok(!/\basync\b/.test(scriptMatch[0]), "must not be async");
 });
 
 test("collapsible sections need no JavaScript", async () => {

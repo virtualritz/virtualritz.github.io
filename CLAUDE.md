@@ -52,10 +52,13 @@ This is a Zola static site generator project with gwern.net-inspired typography:
     0.23 removed shortcodes entirely in favour of Tera components, which
     are global once parsed regardless of which file defines them. Defined
     with `{% component name(...) %}...{% endcomponent name %}`; invoked
-    from content with a body as `{% <name arg="val"> %}body{% </name> %}`,
-    or self-closing with no body as `{{<name arg="val"/>}}`. Kept under
-    `shortcodes/` only by convention, not because Zola looks there
-    specifically.
+    from content with a body as `{% <name arg="val"> %}body{% </name> %}`.
+    All three current components (`admonition`, `collapse`, `marginnote`)
+    unconditionally dereference `body`, so all three require the body
+    form - the self-closing `{{<name .../>}}` form (valid Tera syntax for
+    a component that doesn't use `body`) is not usable with any component
+    currently defined in this project. Kept under `shortcodes/` only by
+    convention, not because Zola looks there specifically.
 - **sass/** - Stylesheet partials (`_tokens.scss` design tokens, `_typography.scss`,
   `_layout.scss`, `_components.scss`, etc.), assembled by `style.scss` and compiled
   by Zola

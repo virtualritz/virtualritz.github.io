@@ -7,3 +7,5 @@
 # Local Claude Code state
 /.claude/settings.local.json
 /.claude/audit/
+# Claude Code worktrees and local state
+/.claude/worktrees/

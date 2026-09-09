@@ -14,9 +14,9 @@
     <section class="recent-posts">
         <h2>Recent Essays</h2>
         {% set essays = get_section(path="essays/_index.md") %}
-        {% if essays.pages %}
+        {% if essays.pages[:5] %}
         <ul class="post-list">
-            {% for page in essays.pages | slice(end=5) %}
+            {% for page in essays.pages[:5]  %}
             <li>
                 <a href="{{ page.permalink }}">{{ page.title }}</a>
                 <span class="date">{{ page.date | date(format="%Y-%m-%d") }}</span>
@@ -35,9 +35,9 @@
     <section class="recent-projects">
         <h2>Projects</h2>
         {% set projects = get_section(path="projects/_index.md") %}
-        {% if projects.pages %}
+        {% if projects.pages[:5] %}
         <ul class="project-list">
-            {% for page in projects.pages | slice(end=5) %}
+            {% for page in projects.pages[:5]  %}
             <li>
                 <a href="{{ page.permalink }}">{{ page.title }}</a>
                 {% if page.description %}

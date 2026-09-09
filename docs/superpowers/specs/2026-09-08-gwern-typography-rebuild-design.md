@@ -32,7 +32,7 @@ generated backlinks.
 | Provenance    | Written fresh; gwern.net measured as reference, no code copied     |
 | Zola          | Upgrade 0.18.0 → 0.23.4 as a prerequisite                          |
 | Justification | `justif` (Knuth–Plass), MIT, self-hosted                           |
-| Body serif    | EB Garamond (see §4 for the open size question)                    |
+| Body serif    | **EB Garamond at 24px/38px**                                       |
 | Headline face | Thunder VF, animated on `wght`                                     |
 | Initial face  | Thunder VF, weight solved to a stroke ratio                        |
 | Popups        | Fetch-and-extract, plus `data/annotations.toml` for external links |
@@ -132,7 +132,7 @@ Two facts that shape usage:
   substitutions against EB Garamond's 1) and has the widest coverage. It
   is the fallback if swashes prove less important than scholarly apparatus.
 
-### OPEN: body size
+### Body size: 24px/38px
 
 EB Garamond has a small x-height, so it sets noticeably smaller than
 Source Serif 4 at the same pixel size:
@@ -148,9 +148,25 @@ EB Garamond     0.400       8.0px        23.8px   ← 19% smaller
 Cormorant       0.386       7.7px        24.6px
 ```
 
-EB Garamond wants **~24px/38px**, and the 895px measure must then be
-re-tuned for line length. This is the one type decision still open:
-EB Garamond at 24px, or Vollkorn at 20px trading swashes for `titl`.
+**Decided: EB Garamond at 24px/38px.** The swash capitals and petite caps
+are worth the resize, and at 24px on a light ground the face is at its
+best.
+
+The measure needs no change, which was not obvious. Average character
+width, weighted by English letter frequency and including spaces:
+
+```
+Source Serif 4 @20px   avg char 8.93px   →  895px = 100.2 characters
+EB Garamond    @24px   avg char 9.05px   →  895px =  98.9 characters
+```
+
+EB Garamond at 24px is within 1.3% of Source Serif 4 at 20px, so gwern's
+895px measure carries over unchanged and reproduces its line length.
+
+Worth recording: that line length is **~100 characters**, well beyond the
+conventional 65–75 guideline. Matching gwern.net here is a deliberate
+choice to be faithful, not an endorsement of the measure. The 1.6
+line-height is what makes it readable.
 
 ### Supporting faces
 
@@ -538,19 +554,17 @@ Without JS, links are just links.
 
 ## 15. Open questions
 
-1. **Body size** — EB Garamond at 24px, or Vollkorn at 20px (§4). The only
-   unresolved type decision.
-2. **Deployment.** The remote `master` carries two commits from 2020 (a
+1. **Deployment.** The remote `master` carries two commits from 2020 (a
    WASM test: `index.html` + `tour/`) which is what
    `virtualritz.github.io` currently serves. Decide whether the Zola site
    replaces it, and whether Pages serves from a workflow, `docs/`, or a
    `gh-pages` branch. No `.github/workflows/` exists yet.
-3. **Font licences** to verify before vendoring: each initial face
+2. **Font licences** to verify before vendoring: each initial face
    individually; Cheshire Initials appears to be personal-use only.
-4. **Does justif stretch a thin space as a word space?** Relevant if we
+3. **Does justif stretch a thin space as a word space?** Relevant if we
    ever reintroduce space characters; currently moot because spacing is
    CSS padding.
-5. `content-visibility: auto` on paragraphs — worth it given justif's
+4. `content-visibility: auto` on paragraphs — worth it given justif's
    placeholder-height handling?
 
 ## 16. Reference

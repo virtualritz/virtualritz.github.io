@@ -18,7 +18,8 @@
     </div>
     {% endif %}
     
-    {% set pages = paginator.pages | default(value=section.pages) %}
+    {% set pages = section.pages %}
+    {% if paginator is defined %}{% set pages = paginator.pages %}{% endif %}
     {% if pages %}
     <div class="page-list">
         {% for page in pages %}
@@ -51,7 +52,7 @@
     </div>
     {% endif %}
     
-    {% if paginator %}
+    {% if paginator is defined %}
     <nav class="pagination">
         {% if paginator.previous %}
         <a href="{{ paginator.previous }}" class="prev">← Previous</a>

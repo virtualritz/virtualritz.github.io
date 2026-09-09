@@ -12,15 +12,19 @@
  *     relayout trigger, which oscillates at some zoom levels.
  *
  * Ordering invariant: the drop cap MUST be in the DOM, and the TOC MUST be
- * out of the first paragraph's box, before justify() is called on the
- * essay's first paragraph. justif has no second pass — inserting the cap
+ * out of the capped paragraph's box, before justify() is called on the
+ * essay's paragraphs. justif has no second pass — inserting the cap
  * afterwards invalidates its already-computed layout for that paragraph
  * and nothing ever recomputes it (measured: only 9/15 paragraphs
  * justified, always missing the capped one), and a preceding-sibling float
  * (the TOC, see templates/page.html and sass/_layout.scss) that still
- * intrudes into that paragraph's box when justif measures it produces the
- * same kind of stuck layout (measured: 6.15 lines instead of 2, the cap
- * orphaned). So run() awaits dropcaps.js's `capPlaced` and toc-move.js's
+ * intrudes into the capped paragraph's box when justif measures it
+ * produces the same kind of stuck layout (measured: 6.15 lines instead of
+ * 2, the cap orphaned). The capped paragraph is not always the first one
+ * (dropcaps.js places the cap on the first paragraph that actually fits —
+ * see its header comment), which is why toc-move.js awaits dropcaps.js's
+ * `capPlaced` to learn which paragraph to anchor on, instead of always
+ * anchoring on the first. So run() awaits `capPlaced` and toc-move.js's
  * `tocMoved` before ever calling justify(), rather than the other way
  * around. Do not reintroduce a "justify, then place the cap" order, and do
  * not "fix" a missed cap by calling `relayout()` afterwards instead —

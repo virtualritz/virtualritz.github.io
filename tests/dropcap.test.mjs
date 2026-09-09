@@ -284,8 +284,29 @@ test("the candidate loop stops at the first paragraph whose cap actually fits", 
   );
   assert.match(
     s,
-    /if \(tryPlaceCap\(p, letter, opts, initial, weight\)\) return;/,
-    "must stop at the first candidate that fits rather than trying the rest",
+    /if \(tryPlaceCap\(p, letter, opts, initial, weight\)\) return p;/,
+    "must stop at the first candidate that fits rather than trying the rest, " +
+      "returning that paragraph as the cap's host",
+  );
+});
+
+test("place() resolves capPlaced with the host paragraph, or null when no cap was placed", () => {
+  const s = dropcapsSrc();
+  assert.match(
+    s,
+    /if \(!container\) return null;/,
+    "must resolve null, not undefined, when .article-body is missing",
+  );
+  assert.match(
+    s,
+    /if \(candidates\.length === 0\) return null;/,
+    "must resolve null when no candidate paragraph has a capitalisable letter",
+  );
+  assert.match(
+    s,
+    /if \(tryPlaceCap\(p, letter, opts, initial, weight\)\) return p;\s*\n\s*\}\s*\n\s*return null;/,
+    "must resolve null when every candidate overhangs, not just fall through " +
+      "to undefined",
   );
 });
 

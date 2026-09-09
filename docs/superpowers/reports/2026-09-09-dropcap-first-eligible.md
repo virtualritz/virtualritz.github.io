@@ -191,3 +191,266 @@ visually verify:
   inputs are unit-tested against synthetic ratios only.
 
 These are exactly the items flagged for your browser sweep.
+
+---
+
+## Follow-up regression: the TOC still anchored on the first paragraph — 2026-09-09
+
+### The bug this time
+
+The fix above changed which paragraph gets the cap, but
+`static/js/toc-move.js` still moved `#toc` unconditionally to a following
+sibling of `.article-body`'s _first_ `<p>` — synchronously, at module
+evaluation, with no knowledge of where the cap actually landed. On the NSI
+essay the cap now lands on paragraph 1 (the italic standfirst), so the TOC
+ended up sitting _between_ paragraph 0 and the capped paragraph 1 — a
+preceding-sibling float intruding into the capped paragraph's box again,
+exactly the failure mode `toc-move.js` was written to avoid, just one
+paragraph later. Live symptom: the drop cap "A" rendered as an orphaned
+letter beside the TOC, with no text wrapping next to it.
+
+### The new coupling between dropcaps.js and toc-move.js
+
+`dropcaps.js`'s `place()` now **returns** the paragraph it actually
+capped — the `p` from the candidate loop — instead of nothing. All of its
+return paths were made explicit:
+
+- `if (!container) return null;` — no `.article-body`.
+- `if (existingBox) return existingBox.parentElement;` — idempotency: a
+  second call reports the same host it found the first time, rather than
+  silently no-op'ing (this branch pre-existed as a guard against a
+  duplicate box; it just didn't report anything before).
+- `if (candidates.length === 0) return null;` — no eligible candidate.
+- `if (tryPlaceCap(...)) return p;` inside the loop — the paragraph that
+  actually took the cap.
+- `return null;` after the loop — every candidate overhung.
+
+`capPlaced` (the exported promise) now resolves with that value directly:
+`found ? place(article) : null` (was `found && place(article)`, which
+could resolve to the boolean `false` instead of `null` — harmless before
+since nothing read the value, but worth tightening now that toc-move.js
+does).
+
+`toc-move.js` imports `capPlaced` from `dropcaps.js` and a new pure
+function, `tocAnchor(capHost, firstPara)`, from the new module
+`static/js/lib/toc-anchor.js`:
+
+```js
+export function tocAnchor(capHost, firstPara) {
+  return capHost ?? firstPara ?? null;
+}
+```
+
+`toc-move.js`'s `moveToc()` (an `async` function, replacing the old
+top-level synchronous `if (toc && firstPara) firstPara.after(toc)`) awaits
+`capPlaced`, feeds the result and the pre-existing `firstPara` lookup into
+`tocAnchor`, and inserts `#toc` after whatever comes back — falling back to
+the first paragraph when no cap was placed, and no-op'ing (leaving the TOC
+where the template put it) when neither exists. This is a genuinely new
+dependency: the header comment in `toc-move.js` used to say "Order
+relative to capPlaced does not matter" — that's now false, and I corrected
+it (see "Comments corrected" below) since `toc-move.js` cannot decide where
+to anchor without first knowing what `capPlaced` resolved to.
+
+The decision itself (`tocAnchor`) is pure and DOM-free, split out
+specifically so it could be unit-tested with real execution rather than
+only the source-regex pinning the rest of `toc-move.js` needs (no DOM
+under `node --test`, no jsdom allowed).
+
+### How I ruled out a hang or deadlock
+
+Two promises are now coupled (`tocMoved` awaits `capPlaced`) where they
+previously settled independently, so I checked this both directions:
+
+- **No cycle**: `dropcaps.js` does not import `toc-move.js` or anything
+  that depends on it — verified by re-reading `dropcaps.js` in full; its
+  only imports are `./lib/wait-for-box.js`, `./lib/dropcap-geometry.js`,
+  `./lib/dropcap-candidates.js`. `capPlaced` is computed independently of
+  `tocMoved`, so there's no A-awaits-B-awaits-A path.
+- **`capPlaced` itself cannot hang**: unchanged from the previous fix —
+  the only asynchronous wait inside `place()` is the
+  `document.fonts.load(...)` pair, and that's raced against a 2-second
+  `setTimeout` via `Promise.race`, which always settles. `waitForBox` above
+  it also has its own bounded ~4s poll-then-give-up. Since `capPlaced`'s
+  own settlement is bounded, `await capPlaced` inside `toc-move.js` cannot
+  hang either — it's bounded by the same budget.
+  - `capPlaced` on `/about/` (no `#article.essay`) resolves synchronously
+    via `Promise.resolve(null)`, bypassing `waitForBox` entirely — this is
+    checked once as part of `article ? ... : Promise.resolve(null)`.
+- **Rejection, not just hang**: `moveToc()` wraps `await capPlaced` in its
+  own `try`/`catch` — if `capPlaced` ever did reject (it's documented not
+  to, but the guard costs nothing), the `catch` logs a warning and falls
+  through with `capHost = null`, so `tocAnchor` still runs and falls back
+  to `firstPara`. A second `try`/`catch` wraps the `tocAnchor` call and the
+  actual `anchor.after(toc)` DOM move, so a throw there (e.g. a detached
+  node) also can't leave `tocMoved` rejected or pending — it's swallowed
+  and logged, same idiom as `mark-para-indent.js`/`mark-long-tokens.js`'s
+  existing top-level `try { ... } catch { console.warn(...) }` pattern.
+  Because both `try`/`catch` blocks are inside the `async function
+moveToc()`, and neither lets an exception escape, the promise assigned
+  to `tocMoved` is guaranteed to _resolve_ (to `undefined`), never reject,
+  on every path — including a throw. This mirrors the existing "must always
+  resolve (never reject/hang)" contract already documented on `capPlaced`.
+- Added a source-pinning test asserting the `try { ... await capPlaced ...
+} catch` shape exists around that specific await, precisely so this
+  guarantee doesn't silently regress later (`toc-move.js never lets
+capPlaced rejecting (or the DOM move throwing) leave tocMoved
+unsettled`).
+- `typography.js`'s `await Promise.all([capPlaced, tocMoved, ...])` is
+  itself inside `run()`'s outer `try`/`catch`, unchanged from before — an
+  unlikely rejection from either promise still resolves `ready` via the
+  existing `catch` block, so the overall pipeline's own resolve-always
+  guarantee is untouched by this change.
+
+### Comments corrected
+
+Doc comments describing the _old_ arrangement (TOC always anchored on the
+first paragraph, order relative to `capPlaced` not mattering) would have
+been actively wrong after this change, so I updated:
+
+- **`static/js/toc-move.js`** (full rewrite of the header comment): now
+  describes anchoring on the _capped_ paragraph via `capPlaced`/
+  `tocAnchor`, why anchoring on the first paragraph unconditionally
+  reproduces the bug one paragraph later, the new resolve-always
+  guarantee and why `capPlaced`'s own bounded settlement makes the await
+  safe, and updated the no-op conditions (no `#toc`, or no paragraph to
+  anchor on at all).
+- **`static/js/dropcaps.js`**: added a paragraph to the header comment
+  noting `toc-move.js` must run after `capPlaced` settles and reads its
+  resolved paragraph; updated the `capPlaced` export's inline comment to
+  document the new resolved value (host paragraph or `null`) and that
+  `toc-move.js` also awaits it.
+- **`static/js/typography.js`**: the "Ordering invariant" paragraph said
+  "the TOC MUST be out of the _first paragraph's_ box" and "essay's first
+  paragraph" — corrected to "the _capped_ paragraph's box" / "essay's
+  paragraphs", and added a sentence explaining the capped paragraph isn't
+  always the first one and why that's exactly why `toc-move.js` awaits
+  `capPlaced`.
+- **`static/js/mark-para-indent.js`** and **`static/js/mark-long-tokens.js`**:
+  re-read both in full; their ordering comments only describe running
+  before `dropcaps.js`/`toc-move.js` touch `.article-body`'s HTML, and
+  before `markPunctuation`/`justify` — neither claim was affected by this
+  change, so neither file needed edits.
+
+### Tests
+
+New pure-logic test file, `tests/toc-anchor.test.mjs` (real execution, no
+source-regex, since `tocAnchor` is DOM-free):
+
+```js
+tocAnchor("p1", "p0") === "p1"; // prefers the cap host
+tocAnchor(null, "p0") === "p0"; // falls back to the first paragraph
+tocAnchor(null, null) === null; // no-op
+```
+
+Updated existing source-pinning tests that pinned the _old_ (buggy)
+literal code shape, since the fix necessarily changes that shape:
+
+- `tests/toc-move.test.mjs`: replaced the assertion on
+  `firstPara.after(toc)`/`if (toc && firstPara)` with assertions that
+  `toc-move.js` imports `tocAnchor` from `./lib/toc-anchor.js` and
+  `capPlaced` from `./dropcaps.js`, moves `#toc` via `anchor.after(toc)`,
+  no-ops on `!toc`, and no-ops when `tocAnchor` returns nothing. Added the
+  new hang/reject-safety test described above. Left the existing
+  "typography.js awaits tocMoved before markPunctuation/justify" test
+  untouched — still valid, still passing.
+- `tests/dropcap.test.mjs`: updated "the candidate loop stops at the first
+  paragraph whose cap actually fits" to expect `return p;` instead of
+  `return;`. Added a new test, "place() resolves capPlaced with the host
+  paragraph, or null when no cap was placed", pinning all three `null`
+  return paths and the `return p` success path.
+
+**Baseline for this follow-up fix: 149 passing** (the count from the
+section above). **New count: 154 passing** (149 + 3 in
+`toc-anchor.test.mjs` + 1 new test in `toc-move.test.mjs`; the other
+changes were edits to existing tests, not new ones — net +5 including the
+one dropped/replaced assertion pair being folded into updated tests rather
+than counted separately).
+
+```
+$ npm test
+...
+# tests 154
+# suites 0
+# pass 154
+# fail 0
+```
+
+**Demonstrated the new tests have teeth** (break → fail → restore, working
+tree clean before and after each):
+
+1. `static/js/lib/toc-anchor.js`: changed `return capHost ?? firstPara ??
+null;` to `return firstPara ?? capHost ?? null;` (reintroducing
+   "always prefer the first paragraph"). `node --test tests/toc-anchor.test.mjs`
+   → 2 pass / 1 fail (`the TOC lands after the cap's host paragraph when a
+cap is placed` failed, asserting `'p1'` but getting `'p0'`). Restored
+   from a pre-edit backup; `git diff --stat` showed no changes after
+   restore.
+2. `static/js/toc-move.js`: changed `if (anchor) anchor.after(toc);` to a
+   bare `anchor.after(toc);` (dropping the no-op guard).
+   `node --test tests/toc-move.test.mjs` → 2 pass / 1 fail (the "moves
+   #toc to a following sibling of whatever tocAnchor picks" test failed on
+   the `if\s*\(\s*anchor\s*\)\s*anchor\.after\(toc\);` assertion). Restored
+   from a pre-edit backup; `git diff --stat` showed the restore matched the
+   intended post-fix file exactly (67 insertions / 31 deletions relative to
+   the pre-fix version, i.e. the real diff, not a stray change).
+
+Full suite after both restores: `npm test` → 154/154.
+
+### Build
+
+```
+$ zola build
+Building site...
+-> Creating 4 pages (0 orphan) and 2 sections
+Done in 81ms.
+
+$ zola check --skip-external-links
+Checking site...
+-> Site content: 4 pages (0 orphan), 2 sections
+Done in 52ms.
+```
+
+Both clean.
+
+### What I inspected in the built HTML (no browser available)
+
+- `/essays/nsi-vs-hydra-vs-riley/`: `.article-body` opens
+  `<p>TL;DR: ...</p><p><em>An architectural review...</em></p><p><em>This
+is not an adoption survey...</em></p><hr/><h2>` — confirms paragraph 0 is
+  the short TL;DR line (the cap's first, rejected candidate) and paragraph
+  1 is the italic standfirst (the confirmed cap host per the task's own
+  diagnosis), matching the scenario `tocAnchor` is meant to handle: anchor
+  on paragraph 1, not paragraph 0.
+- `/essays/typography/` and `/essays/on-typography/`: both still have
+  `#toc` and a long opening paragraph as `.article-body`'s first child with
+  no short lead-in ahead of it, so the cap (per the previous fix, unchanged
+  here) lands on paragraph 0 — `tocAnchor(capHost, firstPara)` returns the
+  same element either way, so the anchor point is byte-for-byte the same
+  node as before this change.
+- `/about/`: no `#toc` in the built HTML at all (confirmed via `rg`) and no
+  `class="essay"` on `<article>`, so `moveToc()` returns immediately on
+  `if (!toc) return;` — both the "no cap" and "no TOC" halves of this
+  page's expected behaviour are unchanged and untouched by this fix.
+
+### What I could not confirm
+
+Per the task's constraint, I cannot drive a browser, so I could not
+visually verify:
+
+- That the NSI essay's cap now renders with visible text wrapping beside
+  it on paragraph 1, and that the TOC renders below that paragraph rather
+  than beside/above it — only that the DOM insertion point and the
+  cap-host resolution logic are structurally correct and unit-tested.
+- That the demo (`/essays/typography/`) and `/essays/on-typography/` pages
+  are pixel-identical to before this change (same anchor node, but not
+  re-rendered/re-measured live).
+- That `/about/` still renders with no cap and no TOC in a live browser
+  (expected from the build-time absence of both `#toc` and the essay
+  class, not re-observed visually).
+- Real timing behavior of the `capPlaced`/`tocMoved` coupling under actual
+  network/font-loading conditions (e.g. a genuinely slow font request
+  hitting the 2s timeout) — only the bounded-by-construction argument
+  above, not an observed real-world race.
+
+These are exactly the items flagged for your browser sweep.

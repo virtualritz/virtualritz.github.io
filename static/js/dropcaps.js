@@ -16,6 +16,12 @@
  * line breaks) — so placing it first is safe. It still needs a real
  * layout box first, same as justif: computed font-size/line-height are
  * unreliable before styles have applied.
+ *
+ * Must also run before toc-move.js relocates `#toc`: the TOC is a
+ * preceding-sibling float that must land after whichever paragraph ends
+ * up hosting the cap, not always the first one (see toc-move.js's header
+ * comment), so toc-move.js awaits `capPlaced` and reads the paragraph it
+ * resolves with.
  */
 import { waitForBox } from "./lib/wait-for-box.js";
 import {
@@ -176,7 +182,11 @@ function tryPlaceCap(p, letter, opts, initial, weight) {
 
 async function place(article) {
   const container = article.querySelector(".article-body");
-  if (!container || container.querySelector(".dropcap-box")) return;
+  if (!container) return null;
+  // Idempotent: a second call (e.g. from a test) reports the same host
+  // rather than silently doing nothing.
+  const existingBox = container.querySelector(".dropcap-box");
+  if (existingBox) return existingBox.parentElement;
 
   const children = Array.from(container.children);
   const candidateIdx = selectDropcapCandidates(
@@ -191,7 +201,7 @@ async function place(article) {
     .map((i) => children[i])
     .map((p) => ({ p, letter: p.textContent.trimStart()[0] }))
     .filter(({ letter }) => letter && /[A-Za-z]/.test(letter));
-  if (candidates.length === 0) return;
+  if (candidates.length === 0) return null;
 
   const cs = getComputedStyle(article);
   const bodySize = parseFloat(cs.fontSize);
@@ -296,18 +306,26 @@ async function place(article) {
       }
     }
 
-    if (tryPlaceCap(p, letter, opts, initial, weight)) return;
+    if (tryPlaceCap(p, letter, opts, initial, weight)) return p;
   }
+  return null;
 }
 
 const article = document.querySelector("#article.essay");
 
 // typography.js imports and awaits this before calling justify() — see the
-// ordering invariant in both files' header comments. Must always resolve
-// (never reject/hang): a stuck promise here would silently disable
-// justification, drop caps and sidenotes together. place() does its own
-// explicit font loading (document.fonts.ready doesn't cover faces nothing
-// else on the page has requested yet — see the comment above).
+// ordering invariant in both files' header comments. toc-move.js also
+// awaits it, to learn which paragraph the TOC must land after — see its
+// header comment. Resolves with the paragraph that actually received the
+// cap, or `null` when none did (a short opening paragraph with no
+// eligible candidate, or any non-essay page). Must always resolve (never
+// reject/hang): a stuck promise here would silently disable
+// justification, drop caps, TOC placement and sidenotes together. place()
+// does its own explicit font loading (document.fonts.ready doesn't cover
+// faces nothing else on the page has requested yet — see the comment
+// above).
 export const capPlaced = article
-  ? waitForBox(".article-body > p").then((found) => found && place(article))
-  : Promise.resolve();
+  ? waitForBox(".article-body > p").then((found) =>
+      found ? place(article) : null,
+    )
+  : Promise.resolve(null);

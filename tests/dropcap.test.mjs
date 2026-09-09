@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   capGeometry,
-  paragraphFitsCapDepth,
+  capOverhangsParagraph,
+  restoreLetter,
   solveWeight,
+  stripLetter,
 } from "../static/js/lib/dropcap-geometry.js";
 
 // EB Garamond at 24px/1.58, measured ratios
@@ -65,18 +67,76 @@ test("grow scales the cap without moving its top", () => {
   assert.ok(Math.abs(b.size / a.size - 1.1) < 0.001);
 });
 
-test("paragraphFitsCapDepth rejects a paragraph shorter than the reserved depth", () => {
-  // EB Garamond 24px/1.58 => one line is 37.92px; 3 lines is 113.76px.
-  const lineHeightPx = 24 * 1.58;
-  // /about/'s opener is 2 lines against LINES = 3: measured to overhang
-  // 38px into the following heading.
-  assert.equal(paragraphFitsCapDepth(2 * lineHeightPx, 3, lineHeightPx), false);
+test("capOverhangsParagraph accepts a box that ends at or above the paragraph's bottom", () => {
+  // The real essay's opener, after placement: box and paragraph both
+  // settle at the same 3-line depth — no overhang.
+  assert.equal(capOverhangsParagraph(113.8, 113.8), false);
+  // Box bottom above the paragraph's is not overhang either.
+  assert.equal(capOverhangsParagraph(100, 113.8), false);
 });
 
-test("paragraphFitsCapDepth accepts a paragraph at least as tall as the reserved depth", () => {
-  const lineHeightPx = 24 * 1.58;
-  assert.equal(paragraphFitsCapDepth(3 * lineHeightPx, 3, lineHeightPx), true);
-  assert.equal(paragraphFitsCapDepth(5 * lineHeightPx, 3, lineHeightPx), true);
+test("capOverhangsParagraph rejects a box that overhangs past the paragraph's bottom", () => {
+  // /about/'s opener, after placement: a 2-line opener against a 3-line
+  // cap overhangs 38px into the following heading.
+  assert.equal(capOverhangsParagraph(75.8 + 38, 75.8), true);
+});
+
+test("capOverhangsParagraph absorbs sub-pixel rounding within epsilon", () => {
+  assert.equal(
+    capOverhangsParagraph(113.8, 113.4),
+    false,
+    "0.4px is sub-pixel noise, not overhang",
+  );
+  assert.equal(
+    capOverhangsParagraph(115.4, 113.8),
+    true,
+    "1.6px is a real overhang, not noise",
+  );
+});
+
+test("stripLetter removes the first occurrence and reports where", () => {
+  // <p> <em>A</em>lpha…</p>'s text node holding "A"
+  assert.deepEqual(stripLetter("Alpha", "A"), { text: "lpha", index: 0 });
+  assert.deepEqual(stripLetter(" Alpha", "A"), { text: " lpha", index: 1 });
+});
+
+test("stripLetter returns null when the letter isn't in this text node", () => {
+  assert.equal(stripLetter(" ", "A"), null);
+});
+
+test("restoreLetter is the exact inverse of stripLetter", () => {
+  for (const [text, letter] of [
+    ["Alpha", "A"],
+    [" Alpha", "A"],
+    ["The A team", "A"],
+    ["A", "A"],
+  ]) {
+    const stripped = stripLetter(text, letter);
+    assert.ok(stripped, `expected "${letter}" to be found in "${text}"`);
+    assert.equal(
+      restoreLetter(stripped.text, letter, stripped.index),
+      text,
+      "restoring must reproduce the original text exactly",
+    );
+  }
+});
+
+test("undo round-trip: strip then restore leaves textContent unchanged, matching dropcaps.js's undo path", () => {
+  // This is the pure logic behind the DOM undo in dropcaps.js: when a
+  // placed cap overhangs, the letter must go back exactly where it came
+  // from. No DOM is available under `node --test`, so this proves the
+  // splice/unsplice arithmetic is exact rather than merely asserting on
+  // dropcaps.js's source text.
+  const original = " Alpha begins the essay.";
+  const letter = "A";
+  const stripped = stripLetter(original, letter);
+  assert.equal(
+    stripped.text,
+    " lpha begins the essay.",
+    "letter removed from the flow",
+  );
+  const restored = restoreLetter(stripped.text, letter, stripped.index);
+  assert.equal(restored, original, "undo must restore the exact original text");
 });
 
 test("solveWeight hits the target stroke ratio", () => {
@@ -107,8 +167,57 @@ test("the initial is stripped from the first text node that actually contains it
   );
   assert.match(
     s,
-    /\.includes\(letter\)/,
+    /stripLetter\(node\.data, letter\)/,
     "must walk forward to the text node that actually contains the letter before stripping it",
+  );
+});
+
+test("the overhang check measures the box after it is placed, not the paragraph before placement", () => {
+  const s = dropcapsSrc();
+  // Regression: measuring p's height before the box exists compares
+  // against a height placement itself is about to change (the float
+  // narrows the column, which can add a line). The check must read
+  // getBoundingClientRect() only after box.after(sr).
+  const boxAfterSrIdx = s.indexOf("box.after(sr)");
+  const overhangCallIdx = s.indexOf("capOverhangsParagraph(");
+  assert.ok(boxAfterSrIdx >= 0 && overhangCallIdx >= 0);
+  assert.ok(
+    boxAfterSrIdx < overhangCallIdx,
+    "must measure for overhang only after the box is in the DOM",
+  );
+  assert.match(
+    s,
+    /box\.getBoundingClientRect\(\)\.bottom/,
+    "must read the placed box's real bottom edge",
+  );
+});
+
+test("an overhanging cap is undone completely: box, .sr, and the stripped letter", () => {
+  const s = dropcapsSrc();
+  const overhangCallIdx = s.indexOf("capOverhangsParagraph(");
+  const boxRemoveIdx = s.indexOf("box.remove()");
+  const srRemoveIdx = s.indexOf("sr.remove()");
+  const restoreIdx = s.indexOf("restoreLetter(");
+  assert.ok(
+    overhangCallIdx >= 0 &&
+      boxRemoveIdx > overhangCallIdx &&
+      srRemoveIdx > overhangCallIdx &&
+      restoreIdx > overhangCallIdx,
+    "the undo must remove the box, remove .sr, and restore the letter — " +
+      "a half-removed cap leaves the paragraph missing its first letter",
+  );
+});
+
+test("the undo path does not throw, so capPlaced still resolves (never rejects)", () => {
+  const s = dropcapsSrc();
+  // place()'s only try/catch is around font loading, well before the
+  // undo branch: a throw inside `if (overhangs) { ... }` would reject
+  // the promise .then() wraps it in, breaking dropcaps.js's own
+  // contract that capPlaced must always resolve.
+  assert.doesNotMatch(
+    s,
+    /if\s*\(overhangs\)\s*\{[^}]*throw/s,
+    "the undo branch must not throw",
   );
 });
 

@@ -20,8 +20,10 @@
 import { waitForBox } from "./lib/wait-for-box.js";
 import {
   capGeometry,
-  paragraphFitsCapDepth,
+  capOverhangsParagraph,
+  restoreLetter,
   solveWeight,
+  stripLetter,
 } from "./lib/dropcap-geometry.js";
 
 const LINES = 3;
@@ -29,6 +31,7 @@ const CAP_DROP_PCT = 3;
 const GROW_PCT = 4;
 const STROKE_RATIO = 5.0; // spec §6: IM Fell English's J measures 5.23x
 const REF = 240; // measure large, then scale: a 24px stem is under 2px
+const OVERHANG_EPSILON_PX = 1; // absorb sub-pixel layout rounding
 
 const cx = document.createElement("canvas").getContext("2d");
 const stemCx = document
@@ -97,23 +100,6 @@ async function place(article) {
     .split(",")[0]
     .replace(/"/g, "")
     .trim();
-
-  // A cap reserves LINES lines of depth regardless of how tall the
-  // opening paragraph actually is. When the paragraph is shorter than
-  // that (e.g. a 2-line opener against LINES = 3), the cap overhangs
-  // below the paragraph's own bottom into whatever comes next — measured
-  // on /about/, into the following heading. Skip the cap rather than
-  // guess a shorter depth; a short opener isn't the essay-length prose
-  // this treatment was designed for.
-  if (
-    !paragraphFitsCapDepth(
-      p.getBoundingClientRect().height,
-      LINES,
-      lineHeight * bodySize,
-    )
-  ) {
-    return;
-  }
 
   // document.fonts.ready only settles for fonts the page has already
   // requested. Neither face here qualifies: --initial is consumed only
@@ -208,11 +194,16 @@ async function place(article) {
   // does. Blindly replacing on whatever comes first is a silent no-op
   // when that node doesn't contain the letter, and the letter then
   // duplicates: once in the dropcap box, once still in the flowed text.
+  // stripLetter also hands back the index it removed from, which is what
+  // makes the removal exactly reversible if the cap below turns out not
+  // to fit — a plain .replace(letter, "") loses that position.
   const walker = document.createTreeWalker(p, 4);
   let node;
+  let stripped;
   while ((node = walker.nextNode())) {
-    if (node.data.includes(letter)) {
-      node.data = node.data.replace(letter, "");
+    stripped = stripLetter(node.data, letter);
+    if (stripped) {
+      node.data = stripped.text;
       break;
     }
   }
@@ -243,6 +234,28 @@ async function place(article) {
   sr.className = "sr";
   sr.textContent = letter;
   box.after(sr);
+
+  // Only now — with the box actually in the DOM — does its real height
+  // reflect what placing it does to the paragraph: the float narrows the
+  // text column, which can push the same prose onto an extra line. A
+  // check made *before* placement (the previous fix wave's approach)
+  // compares against a height the placement itself is about to change
+  // (measured on the real essay's opener: 75.8px pre-placement vs 113.8px
+  // after — the guard rejected a cap that in fact fit exactly). So place
+  // first, force this layout read, and undo if the box overhangs.
+  const overhangs = capOverhangsParagraph(
+    box.getBoundingClientRect().bottom,
+    p.getBoundingClientRect().bottom,
+    OVERHANG_EPSILON_PX,
+  );
+  if (overhangs) {
+    // Undo completely, leaving the paragraph exactly as found. A
+    // half-removed cap — box gone but the initial letter still missing —
+    // is worse than either placing the cap or skipping it outright.
+    box.remove();
+    sr.remove();
+    node.data = restoreLetter(node.data, letter, stripped.index);
+  }
 }
 
 const article = document.querySelector("#article.essay");

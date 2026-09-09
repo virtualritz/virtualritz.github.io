@@ -13,15 +13,48 @@
 const LINE_HYSTERESIS = 0.04;
 
 /**
- * Whether the opening paragraph is tall enough to justify reserving
- * `lines` lines for the cap. A short opener set against a fixed line
- * count overhangs past the paragraph's own bottom into whatever follows
- * (measured on /about/: a 2-line opener against LINES = 3 overhangs 38px
- * and overlaps the next heading) — the general case of which the specific
- * `about.md` defect is one instance.
+ * Whether a drop-cap box, once actually placed, overhangs the paragraph
+ * it was placed into — the floated box reserves a fixed number of lines,
+ * but a short opening paragraph can wrap onto fewer lines than that, so
+ * the box's bottom edge falls past the paragraph's own bottom into
+ * whatever follows (measured on /about/: a 2-line opener against a
+ * 3-line cap overhangs 38px into the next heading). This can only be
+ * checked after placement, not predicted from the paragraph's
+ * pre-placement height: placing the floated box is itself what narrows
+ * the text column and can push the same prose onto an extra line
+ * (measured on the real essay's opener: 75.8px before placement vs.
+ * 113.8px after — a pre-placement check compares against a height that
+ * placement is about to change). `epsilonPx` absorbs sub-pixel rounding
+ * from the browser's layout engine.
  */
-export function paragraphFitsCapDepth(paragraphHeightPx, lines, lineHeightPx) {
-  return paragraphHeightPx >= lines * lineHeightPx;
+export function capOverhangsParagraph(
+  boxBottomPx,
+  paragraphBottomPx,
+  epsilonPx = 1,
+) {
+  return boxBottomPx > paragraphBottomPx + epsilonPx;
+}
+
+/**
+ * Remove the first occurrence of `letter` from `text`, returning both the
+ * stripped text and the index it was removed from. The index is what
+ * makes the removal exactly reversible — `text.replace(letter, "")` alone
+ * loses the position — which matters when a placed cap turns out to
+ * overhang and has to be undone: the initial letter must go back exactly
+ * where it came from, not merely somewhere in the string.
+ */
+export function stripLetter(text, letter) {
+  const index = text.indexOf(letter);
+  if (index === -1) return null;
+  return {
+    text: text.slice(0, index) + text.slice(index + letter.length),
+    index,
+  };
+}
+
+/** Inverse of stripLetter: reinsert `letter` at `index`. */
+export function restoreLetter(text, letter, index) {
+  return text.slice(0, index) + letter + text.slice(index);
 }
 
 export function capGeometry({

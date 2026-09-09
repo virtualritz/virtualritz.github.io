@@ -11,17 +11,22 @@
  *     observing its own container feeds its height changes back in as a
  *     relayout trigger, which oscillates at some zoom levels.
  *
- * Ordering invariant: the drop cap MUST be in the DOM before justify() is
- * called on the essay's first paragraph. justif has no second pass —
- * inserting the cap afterwards invalidates its already-computed layout for
- * that paragraph and nothing ever recomputes it (measured: only 9/15
- * paragraphs justified, always missing the capped one). So run() awaits
- * dropcaps.js's `capPlaced` before ever calling justify(), rather than the
- * other way around. Do not reintroduce a "justify, then place the cap"
- * order, and do not "fix" a missed cap by calling `relayout()` afterwards
- * instead — `relayout()` calls controller.refresh(), which is actively
- * harmful here (measured: justified count went 9 → 7, and the capped
- * paragraph still wasn't justified).
+ * Ordering invariant: the drop cap MUST be in the DOM, and the TOC MUST be
+ * out of the first paragraph's box, before justify() is called on the
+ * essay's first paragraph. justif has no second pass — inserting the cap
+ * afterwards invalidates its already-computed layout for that paragraph
+ * and nothing ever recomputes it (measured: only 9/15 paragraphs
+ * justified, always missing the capped one), and a preceding-sibling float
+ * (the TOC, see templates/page.html and sass/_layout.scss) that still
+ * intrudes into that paragraph's box when justif measures it produces the
+ * same kind of stuck layout (measured: 6.15 lines instead of 2, the cap
+ * orphaned). So run() awaits dropcaps.js's `capPlaced` and toc-move.js's
+ * `tocMoved` before ever calling justify(), rather than the other way
+ * around. Do not reintroduce a "justify, then place the cap" order, and do
+ * not "fix" a missed cap by calling `relayout()` afterwards instead —
+ * `relayout()` calls controller.refresh(), which is actively harmful here
+ * (measured: justified count went 9 → 7, and the capped paragraph still
+ * wasn't justified).
  *
  * `ready` must resolve even when justif fails, or when drop-cap placement
  * throws: Task 9 and Task 10 both await it, and a hung promise would
@@ -37,6 +42,7 @@ import { hyphenateEnUS } from "./lib/justif/hyphenate/en-us.js";
 import { markPunctuation } from "./lib/punctuation.js";
 import { waitForBox } from "./lib/wait-for-box.js";
 import { capPlaced } from "./dropcaps.js";
+import { tocMoved } from "./toc-move.js";
 
 const SELECTOR =
   ".article-body p, .article-body li, .article-body blockquote p";
@@ -58,8 +64,8 @@ async function run() {
     if (!body) return resolveReady();
 
     // Must come before markPunctuation/justify — see the ordering
-    // invariant in the header comment. A no-op on non-essay pages.
-    await capPlaced;
+    // invariant in the header comment. Both are no-ops on non-essay pages.
+    await Promise.all([capPlaced, tocMoved]);
 
     markPunctuation(body);
 

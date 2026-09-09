@@ -112,10 +112,16 @@ test("typography.js awaits dropcaps.js's capPlaced before marking punctuation or
     /import\s*\{\s*capPlaced\s*\}\s*from\s*"\.\/dropcaps\.js"/,
     "typography.js must import capPlaced from dropcaps.js",
   );
-  const capIdx = s.indexOf("await capPlaced");
+  const awaitMatch = s.match(
+    /await\s+(?:capPlaced|Promise\.all\(\[[^\]]*capPlaced[^\]]*\]\))/,
+  );
   const punctIdx = s.indexOf("markPunctuation(body)");
   const justifyIdx = s.indexOf("justify(targets");
-  assert.ok(capIdx >= 0, "run() must await capPlaced");
+  assert.ok(
+    awaitMatch,
+    "run() must await capPlaced, alone or alongside other pre-justify work",
+  );
+  const capIdx = awaitMatch.index;
   assert.ok(punctIdx >= 0 && justifyIdx >= 0);
   assert.ok(
     capIdx < punctIdx && capIdx < justifyIdx,

@@ -1,1 +1,52 @@
-// filled in by a later task
+// gwern.net's technique, measured: a 2px dotted gradient underline plus
+// seven zero-blur text-shadows in the page ground, which cut the
+// underline around descenders. Zero blur and vertical-only offsets
+// matter: justif treats a blurred shadow as a halo and stops protruding
+// glyphs through it.
+.article-body a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(
+    to right,
+    currentColor 50%,
+    transparent 50%
+  );
+  background-size: 2px 1px;
+  background-repeat: repeat-x;
+  background-position: 0 calc(100% - 1.9px);
+  text-shadow:
+    0 0.05em var(--paper),
+    0.05em 0.05em var(--paper),
+    -0.05em 0.05em var(--paper),
+    0.16em 0.05em var(--paper),
+    -0.16em 0.05em var(--paper),
+    0.16em 0 var(--paper),
+    -0.16em 0 var(--paper);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--ink);
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 100% 1px;
+  }
+}
+
+// external links get a mark from rel, which Zola sets, so it works
+// identically under `zola serve` and in production
+.article-body a[rel~="noopener"]::after,
+.article-body a[target="_blank"]::after {
+  content: "\2197";
+  font-size: 0.62em;
+  vertical-align: super;
+  margin-left: 0.08em;
+  opacity: 0.5;
+  text-shadow: none;
+  background: none;
+}
+
+#toc a,
+.article-meta a,
+#site-nav a {
+  background: none;
+  text-shadow: none;
+}

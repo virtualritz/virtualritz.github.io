@@ -1,67 +1,25 @@
-{% extends "base.html" %}
-
-{% block title %}{{ section.title }} - {{ config.title }}{% endblock title %}
-{% block description %}{{ section.description }}{% endblock description %}
-
-{% block content %}
-<article class="section">
-    <header class="section-header">
-        <h1>{{ section.title }}</h1>
-        {% if section.description %}
-        <p class="description">{{ section.description }}</p>
-        {% endif %}
-    </header>
-    
-    {% if section.content %}
-    <div class="section-content">
-        {{ section.content | safe }}
-    </div>
-    {% endif %}
-    
-    {% set pages = section.pages %}
-    {% if paginator is defined %}{% set pages = paginator.pages %}{% endif %}
-    {% if pages %}
-    <div class="page-list">
-        {% for page in pages %}
-        <article class="list-item">
-            <h2><a href="{{ page.permalink }}">{{ page.title }}</a></h2>
-            <div class="metadata">
-                {% if page.date %}
-                <time datetime="{{ page.date | date(format="%Y-%m-%d") }}">
-                    {{ page.date | date(format="%B %d, %Y") }}
-                </time>
-                {% endif %}
-                {% if page.reading_time %}
-                <span class="reading-time">· {{ page.reading_time }} min read</span>
-                {% endif %}
-            </div>
-            {% if page.description %}
-            <p class="description">{{ page.description }}</p>
-            {% elif page.summary %}
-            <p class="summary">{{ page.summary | truncate(length=200) }}</p>
-            {% endif %}
-            {% if page.taxonomies.tags %}
-            <div class="tags">
-                {% for tag in page.taxonomies.tags %}
-                <span class="tag">{{ tag }}</span>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </article>
-        {% endfor %}
-    </div>
-    {% endif %}
-    
-    {% if paginator is defined %}
-    <nav class="pagination">
-        {% if paginator.previous %}
-        <a href="{{ paginator.previous }}" class="prev">← Previous</a>
-        {% endif %}
-        <span class="page-number">Page {{ paginator.current_index }} of {{ paginator.number_pagers }}</span>
-        {% if paginator.next %}
-        <a href="{{ paginator.next }}" class="next">Next →</a>
-        {% endif %}
-    </nav>
-    {% endif %}
+{% extends "base.html" %} {% block title %}{{ section.title }} · {{ config.title
+}}{% endblock title %} {% block description %}{% if section.description %}{{
+section.description }}{% else %}{{ config.description }}{% endif %}{% endblock
+description %} {% block content %}
+<article id="article">
+  <header><h1>{{ section.title }}</h1></header>
+  <div class="article-body">{{ section.content | safe }}</div>
+  <ul class="post-list">
+    {% for page in section.pages %}
+    <li>
+      <a href="{{ page.permalink }}">{{ page.title }}</a>
+      <span class="post-meta">
+        {% if page.date %}<time datetime="{{ page.date }}"
+          >{{ page.date | date(format="%-d %B %Y") }}</time
+        >{% endif %} {% if page.reading_time %} · {{ page.reading_time }} min{%
+        endif %}
+      </span>
+      {% if page.description %}<span class="post-desc"
+        >{{ page.description }}</span
+      >{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
 </article>
 {% endblock content %}

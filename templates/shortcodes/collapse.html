@@ -1,0 +1,10 @@
+{# See templates/shortcodes/admonition.html for why this is a Tera component
+rather than a Zola shortcode. Usage from content: {%
+<collapse summary="Details"> %} Body text, rendered as markdown. {% </collapse>
+%} `summary` is optional and defaults to "Show more". #} {% component
+collapse(summary = "Show more") %}
+<details class="collapse">
+  <summary>{{ summary }}</summary>
+  {{ body | markdown | safe }}
+</details>
+{% endcomponent collapse %}

@@ -1,0 +1,16 @@
+{# Zola 0.23 removed shortcodes (templates/shortcodes/*.html invoked as `{{
+name(...) }}` functions) in favour of Tera components — see
+https://github.com/getzola/zola/blob/master/docs/content/documentation/content/overview.md#migrating-from-shortcodes
+and https://keats.github.io/tera/#components. Components are global once parsed,
+so this file's directory no longer has special meaning to Zola; it is kept only
+for continuity with the rest of the project. Usage from content: {%
+<admonition kind="warning"> %} Body text, rendered as markdown. {% </admonition>
+%} `kind` and `label` are optional; `label` falls back to `kind`, which falls
+back to "note". #} {% component admonition(kind = "note", label = "") %}
+<aside class="admonition {{ kind }}">
+  <span class="admonition-label"
+    >{% if label %}{{ label }}{% else %}{{ kind }}{% endif %}</span
+  >
+  {{ body | markdown | safe }}
+</aside>
+{% endcomponent admonition %}

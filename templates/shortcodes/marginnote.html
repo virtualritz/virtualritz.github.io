@@ -1,0 +1,12 @@
+{# See templates/shortcodes/admonition.html for why this is a Tera component
+rather than a Zola shortcode. Usage from content, inline within a sentence: a
+claim{% <marginnote> %}the note text{% </marginnote> %} continues. marginnote is
+always invoked inline, mid-sentence: Zola substitutes a component's rendered
+output verbatim into the surrounding markdown source before that source is
+parsed, so any newline in the output becomes a literal line break in running
+prose and corrupts the paragraph (reproduced empirically against a real build).
+The `-%}` and `{%-` trims below strip the newlines around the span so the
+substituted output is a single line; do not let a formatter re-wrap the span
+itself onto multiple lines. #} {%- component marginnote() -%}
+<span class="marginnote">{{ body | markdown(inline=true) | safe }}</span>
+{%- endcomponent marginnote -%}

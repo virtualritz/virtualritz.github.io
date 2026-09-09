@@ -8,7 +8,9 @@ tags = ["typography", "web"]
 +++
 
 _Every typographic device this site has, on one page, so a change that
-breaks one of them is visible immediately._
+breaks one of them is visible immediately. The opening paragraph runs to at
+least three lines on purpose: that is the depth the drop cap reserves, and a
+shorter one would leave the initial overhanging into whatever follows it._
 
 ---
 

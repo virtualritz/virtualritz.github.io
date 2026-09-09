@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { capGeometry, solveWeight } from "../static/js/lib/dropcap-geometry.js";
+import {
+  capGeometry,
+  paragraphFitsCapDepth,
+  solveWeight,
+} from "../static/js/lib/dropcap-geometry.js";
 
 // EB Garamond at 24px/1.58, measured ratios
 const body = { fbAsc: 1.007, fbDesc: 0.298, capInk: 0.65 };
@@ -61,6 +65,20 @@ test("grow scales the cap without moving its top", () => {
   assert.ok(Math.abs(b.size / a.size - 1.1) < 0.001);
 });
 
+test("paragraphFitsCapDepth rejects a paragraph shorter than the reserved depth", () => {
+  // EB Garamond 24px/1.58 => one line is 37.92px; 3 lines is 113.76px.
+  const lineHeightPx = 24 * 1.58;
+  // /about/'s opener is 2 lines against LINES = 3: measured to overhang
+  // 38px into the following heading.
+  assert.equal(paragraphFitsCapDepth(2 * lineHeightPx, 3, lineHeightPx), false);
+});
+
+test("paragraphFitsCapDepth accepts a paragraph at least as tall as the reserved depth", () => {
+  const lineHeightPx = 24 * 1.58;
+  assert.equal(paragraphFitsCapDepth(3 * lineHeightPx, 3, lineHeightPx), true);
+  assert.equal(paragraphFitsCapDepth(5 * lineHeightPx, 3, lineHeightPx), true);
+});
+
 test("solveWeight hits the target stroke ratio", () => {
   // synthetic face whose stem is linear in weight
   const stem = (w) => 0.0002 * w;
@@ -75,6 +93,24 @@ test("solveWeight hits the target stroke ratio", () => {
 
 const dropcapsSrc = () =>
   readFileSync(new URL("../static/js/dropcaps.js", import.meta.url), "utf8");
+
+test("the initial is stripped from the first text node that actually contains it, not just the first text node", () => {
+  const s = dropcapsSrc();
+  // <p> <em>A</em>lpha…</p> has a leading whitespace text node ahead of
+  // the one holding "A". Blindly stripping from whatever nextNode()
+  // returns first silently no-ops on that whitespace node and the
+  // letter duplicates (shown once in the box, once still in the flow).
+  assert.doesNotMatch(
+    s,
+    /const first = document\.createTreeWalker\(p, 4\)\.nextNode\(\);\s*\n\s*first\.data = first\.data\.replace\(letter, ""\);/,
+    "must not strip the letter from whichever text node happens to come first",
+  );
+  assert.match(
+    s,
+    /\.includes\(letter\)/,
+    "must walk forward to the text node that actually contains the letter before stripping it",
+  );
+});
 
 test("the .sr span is inserted after the box, not prepended to the paragraph", () => {
   const s = dropcapsSrc();

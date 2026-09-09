@@ -12,6 +12,18 @@
 // oscillates between 3 and 4 (spec §6).
 const LINE_HYSTERESIS = 0.04;
 
+/**
+ * Whether the opening paragraph is tall enough to justify reserving
+ * `lines` lines for the cap. A short opener set against a fixed line
+ * count overhangs past the paragraph's own bottom into whatever follows
+ * (measured on /about/: a 2-line opener against LINES = 3 overhangs 38px
+ * and overlaps the next heading) — the general case of which the specific
+ * `about.md` defect is one instance.
+ */
+export function paragraphFitsCapDepth(paragraphHeightPx, lines, lineHeightPx) {
+  return paragraphHeightPx >= lines * lineHeightPx;
+}
+
 export function capGeometry({
   bodyMetrics,
   glyphMetrics,

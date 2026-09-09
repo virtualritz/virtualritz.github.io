@@ -96,6 +96,33 @@ The site implements advanced gwern.net-inspired typography:
 - **Enhanced blockquotes**: With decorative quotes
 - **Dotted link underlines**: Distinctive link styling
 
+### Paragraph breaks: two styles, chosen in the source
+
+A paragraph break renders one of two ways, and the markdown source picks
+which:
+
+- **Blank line** (a normal new paragraph) → an empty line of vertical
+  space, flush left. This is the default for every `<p>` and needs no
+  special authoring; it is a deliberate break between thoughts.
+- **Hard line break** (end a line with a backslash `\` or two trailing
+  spaces, which CommonMark renders as `<br>`) → the following line is
+  indented 2.5em with **no** vertical gap — continuous prose, book style.
+
+Mechanically: `sass/_typography.scss` gives every `<p>` `text-indent: 0`
+and puts the gap on `p + p` (one line-height). The indent comes from a
+`.para-indent` marker span (`display: inline-block; width: 2.5em`)
+inserted right after each `<br>` at runtime by
+`static/js/mark-para-indent.js` (pure logic in
+`static/js/lib/para-indent.js`) — `text-indent` can't do this alone,
+because `each-line` would also indent the paragraph's own first line,
+which the flush-break case forbids, and a `::before`/`::after` on `<br>`
+itself does not render in any browser tested.
+
+**No-JS degradation:** the `<br>` itself is server-rendered by Zola, so
+the line break always happens. Only the indent is JS-dependent; without
+it, a hard-break continuation reads as a flush line directly under the
+one above, with no visual distinction from a wrapped line.
+
 ### Templates
 
 There is a single base layout (no per-page layout variants):

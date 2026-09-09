@@ -55,24 +55,26 @@
   hanging-punctuation: allow-end; // inert in Chrome today; free when it ships
   font-variant-numeric: oldstyle-nums;
 
+  // Paragraph breaks are distinguished in the source, not implied by every
+  // <p>: a blank line (a new <p>) gets a gap and stays flush; a hard line
+  // break (CommonMark "\" or two trailing spaces, i.e. a <br>) gets an
+  // indented continuation with no gap, via the .para-indent marker span
+  // inserted after the <br> by static/js/mark-para-indent.js. text-indent
+  // can't do this on its own — `each-line` indents the paragraph's own
+  // first line too, which the flush-break case forbids. The first
+  // paragraph keeps margin 0 (p+p only matches a *following* paragraph) so
+  // the drop cap and heading spacing are unaffected.
   p {
     margin: 0;
-    text-indent: var(--indent);
+    text-indent: 0;
+  }
+  p + p {
+    margin-top: calc(var(--body-lh) * 1em);
   }
 
-  // first paragraph, and any paragraph opening a section, sits flush
-  > p:first-of-type,
-  h1 + p,
-  h2 + p,
-  h3 + p,
-  h4 + p,
-  blockquote + p,
-  figure + p,
-  pre + p,
-  ul + p,
-  ol + p,
-  table + p {
-    text-indent: 0;
+  .para-indent {
+    display: inline-block;
+    width: var(--indent);
   }
 
   blockquote {

@@ -12,11 +12,19 @@ test("body text is justified with hyphenation and oldstyle figures", async () =>
   assert.match(body, /oldstyle-nums/);
 });
 
-test("paragraphs are indent-separated, first one flush", async () => {
+test("paragraphs are flush with a gap; .para-indent marks a hard-break continuation", async () => {
   const c = await css();
-  assert.match(c, /\.article-body\s+p\s*\{[^}]*margin:\s*0/);
-  assert.match(c, /text-indent:\s*var\(--indent\)/);
-  assert.match(c, /first-of-type[^{]*\{[^}]*text-indent:\s*0/);
+  // Zola emits compressed CSS: no space after the selector's `{`, no
+  // trailing `;` before `}`.
+  assert.match(c, /\.article-body p\{margin:0;text-indent:0\}/);
+  assert.match(
+    c,
+    /\.article-body p\+p\{margin-top:calc\(var\(--body-lh\)\*1em\)\}/,
+  );
+  assert.match(
+    c,
+    /\.para-indent\{display:inline-block;width:var\(--indent\)\}/,
+  );
 });
 
 test("h1 is small-caps with a solid rule, h2 uppercase with a dotted rule", async () => {

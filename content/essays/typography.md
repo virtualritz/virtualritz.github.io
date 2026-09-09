@@ -22,11 +22,13 @@ rivers of whitespace down the column. Knuth--Plass weighs the paragraph
 whole and the difference shows inside the first five lines of any
 figure-heavy passage.
 
-This paragraph is indented rather than spaced, which is how books have set
-continuous prose for five centuries. The first paragraph of a section is
-flush; every one after it is indented by 2.5em. There is no vertical gap,
-because the indent already says "new paragraph" and the gap would say it
-twice.
+A paragraph break here is one of two things, distinguished in the source
+rather than styled uniformly. A blank line says "new paragraph": it opens a
+gap and stays flush. A hard line break (two trailing spaces, or a
+backslash) says "continued" instead---it indents by 2.5em with no gap at
+all, the way continuous prose has been set for five centuries.\
+This second line is exactly that kind of break: no gap above it, an indent
+instead.
 
 Sentences end with a slightly wider space than the words inside them---
 English spacing, and the extra width comes from CSS rather than a Unicode

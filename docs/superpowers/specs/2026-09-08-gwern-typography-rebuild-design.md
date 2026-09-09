@@ -81,6 +81,21 @@ from memory.
 | Sidenotes    | Two absolute columns `#sidenote-column-{left,right}`; footnotes converted to `div.sidenote#snN`, JS-positioned against `a.footnote-ref#fnrefN`                                    |
 | Drop cap     | `<span class="dropcap">` inside a link; Kanzlei Initialen 140px/140px, `float:left`, `margin-bottom:-35px`, `#191919`; face chosen per page by a `dropcaps-*` body class          |
 
+_Correction (2026-09-09):_ the "Paragraphs" row above described gwern.net's
+model — indent every paragraph, no gap, first paragraph flush — and this
+site matched it at first. The site owner has since deliberately inverted
+that for this site's own paragraphs: `text-indent: 0` on every `<p>`, a
+one-line-height gap on `p + p`, and — the part gwern.net has no equivalent
+of — an _indented, gap-less_ continuation when the source uses a hard line
+break (`\` or two trailing spaces, i.e. `<br>`) rather than a blank line.
+A blank line is a deliberate break between thoughts (gap, flush); a hard
+break is a continuation of the same thought (indent, no gap). See
+`sass/_typography.scss`, `static/js/mark-para-indent.js`, and the
+"Paragraph breaks" section of the top-level `CLAUDE.md` for the mechanism
+and the authoring convention. Not a gwern.net deviation on a whim — the
+old row above is now wrong for this codebase and is left in place only as
+a record of where the design started.
+
 ### What gwern.net does _not_ do
 
 Measured, not assumed:

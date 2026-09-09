@@ -68,3 +68,39 @@ test("typography.js gates on a layout box and adds no ResizeObserver", () => {
     "punctuation must be marked before measuring",
   );
 });
+
+test("typography.js exits early when the selector matches nothing", () => {
+  const src = readFileSync(root + "static/js/typography.js", "utf8");
+  assert.match(
+    src,
+    /querySelectorAll\(SELECTOR\)\.length === 0/,
+    "an image/embed-only page has no match at all; `ready` should resolve " +
+      "synchronously in frame one, not after the ~4s rAF poll budget",
+  );
+});
+
+test("declined paragraphs are reported with reasons, not just a count", () => {
+  const src = readFileSync(root + "static/js/typography.js", "utf8");
+  assert.match(
+    src,
+    /onSkip:\s*\(p,\s*reason\)/,
+    "onSkip must capture the reason, not just tally occurrences: spec " +
+      "§14.8 requires verifying which paragraph was declined and why",
+  );
+  assert.match(
+    src,
+    /console\.warn/,
+    "declined paragraphs must be surfaced somewhere a human can find them",
+  );
+});
+
+test("a synchronous throw in run() still resolves `ready`", () => {
+  const src = readFileSync(root + "static/js/typography.js", "utf8");
+  assert.match(
+    src,
+    /function run\(\)\s*\{\s*try\s*\{/,
+    "run()'s body must be wrapped in try/catch: `ready` must not depend " +
+      "on justif's current (undocumented) behaviour of turning internal " +
+      "errors into a rejected controller.ready",
+  );
+});

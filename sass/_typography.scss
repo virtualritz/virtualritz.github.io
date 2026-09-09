@@ -166,6 +166,14 @@
     font-variant: small-caps;
     letter-spacing: 0.02em;
   }
+
+  // `****foo****` parses as nested <strong><strong>: pulldown-cmark's
+  // shorthand for small caps without a span, so the bold both strengths
+  // add together must be reset to normal weight.
+  strong strong {
+    font-variant: small-caps;
+    font-weight: normal;
+  }
 }
 
 .article-meta {

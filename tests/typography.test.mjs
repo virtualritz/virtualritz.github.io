@@ -47,6 +47,16 @@ test("h1 is small-caps with a solid rule, h2 uppercase with a dotted rule", asyn
   assert.match(h2, /border-bottom:\s*0?\.8px dotted/);
 });
 
+test("nested strong (`****foo****`) gets small caps with the bold reset", async () => {
+  const c = await css();
+  const rule = c.match(/\.article-body strong strong\{([^}]*)\}/)[1];
+  assert.match(
+    rule,
+    /font-variant:\s*small-caps|font-variant-caps:\s*small-caps/,
+  );
+  assert.match(rule, /font-weight:\s*normal/);
+});
+
 test("the essay renders its title once, from frontmatter", async () => {
   const html = (await buildSite()).read(
     "essays/nsi-vs-hydra-vs-riley/index.html",

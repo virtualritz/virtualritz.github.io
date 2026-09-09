@@ -29,6 +29,9 @@ test("demo page exercises every feature", async () => {
     ["code block", "<pre"],
     ["blockquote", "<blockquote"],
     ["small caps", "small-caps"],
+    // `****foo****` parses as nested <strong><strong>, the CSS-only
+    // small-caps shorthand alongside the .small-caps span.
+    ["small caps via nested strong", "<strong><strong>nasa</strong></strong>"],
     ["em dash", "—"],
     ["en dash", "–"],
     ["curly quotes", "“"],

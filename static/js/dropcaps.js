@@ -64,7 +64,7 @@ function stemRatio(family, ch, weight) {
   return best / px;
 }
 
-function place(article) {
+async function place(article) {
   const p = article.querySelector(".article-body > p");
   if (!p || p.querySelector(".dropcap-box")) return;
 
@@ -85,6 +85,26 @@ function place(article) {
     .split(",")[0]
     .replace(/"/g, "")
     .trim();
+
+  // document.fonts.ready only settles for fonts the page has already
+  // requested. Neither face here qualifies: --display (also Thunder VF)
+  // is unused anywhere in sass/, --initial is consumed only by .dropcap
+  // (which this function creates), and there is no <link rel=preload>.
+  // So the first request for either face would otherwise be our own
+  // measureText calls below, which return fallback-font metrics
+  // synchronously on that first call — and a fallback glyph's ink is
+  // still positive, so capGeometry's `inkAsc > 0` guard can't catch it.
+  // Ask for both explicitly and wait. A rejected load (missing/blocked
+  // font) degrades to the fallback already in the --serif/--initial
+  // stack rather than throwing.
+  try {
+    await Promise.all([
+      document.fonts.load(`${REF}px "${initial}"`, letter),
+      document.fonts.load(`${REF}px "${serif}"`, "Hl"),
+    ]);
+  } catch {
+    // fall through — measurement reflects whichever face is available
+  }
 
   const bodyH = inkRatios(serif, "H");
   const bodyMetrics = {
@@ -113,13 +133,24 @@ function place(article) {
       ...opts,
       glyphMetrics: inkRatios(initial, letter, 400),
     });
-    if (probe)
+    if (probe) {
+      // Stroke weight is a property of the face, not of the letter being
+      // set. Probe "I" — a clean vertical at any weight — rather than the
+      // actual initial: a diagonal (A, V, W) or a bowl (O, Q) crosses the
+      // scan row wider than its true perpendicular thickness, which would
+      // read as a heavier stem than it is and make solveWeight land on a
+      // weight that's too light. The body side already probes "l" for the
+      // same reason. Fall back to the initial letter if "I" has no ink
+      // (unlikely, but avoids handing solveWeight a stem that's always
+      // zero).
+      const stemGlyph = stemRatio(initial, "I", 400) > 0 ? "I" : letter;
       weight = solveWeight(
-        (w) => stemRatio(initial, letter, w),
+        (w) => stemRatio(initial, stemGlyph, w),
         bodyStemPx,
         STROKE_RATIO,
         probe.size,
       );
+    }
   }
 
   const g = capGeometry({
@@ -157,10 +188,8 @@ function place(article) {
 
 const article = document.querySelector("#article.essay");
 if (article) {
-  // after justif: it changes paragraph geometry
-  ready.then(() =>
-    document.fonts.ready.then(() =>
-      requestAnimationFrame(() => place(article)),
-    ),
-  );
+  // after justif: it changes paragraph geometry. place() does its own
+  // explicit font loading (document.fonts.ready doesn't cover faces
+  // nothing else on the page has requested yet — see the comment above).
+  ready.then(() => requestAnimationFrame(() => place(article)));
 }

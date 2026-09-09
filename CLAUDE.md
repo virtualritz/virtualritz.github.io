@@ -90,7 +90,7 @@ The site implements advanced gwern.net-inspired typography:
 
 - **Smart punctuation**: Automatic curly quotes, em/en dashes
 - **Drop caps**: Ink-measured, stroke-width-matched ornamental first letters for essays
-- **Small caps**: For section headers and emphasis
+- **Small caps**: For section headers and emphasis. Either `<span class="small-caps">foo</span>`, or `****foo****` — pulldown-cmark parses four asterisks either side as nested `<strong><strong>`, and `sass/_typography.scss`'s `.article-body strong strong` rule gives that `font-variant: small-caps` with the bold reset to normal weight.
 - **Sidenotes**: Margin notes hoisted from Zola's own footnotes on wide screens (degrades to a plain footnote list below the breakpoint, no JS required)
 - **Dark mode toggle**: Persistent theme switching, applied before first paint to avoid a flash of the wrong theme
 - **Enhanced blockquotes**: With decorative quotes
@@ -104,24 +104,43 @@ which:
 - **Blank line** (a normal new paragraph) → an empty line of vertical
   space, flush left. This is the default for every `<p>` and needs no
   special authoring; it is a deliberate break between thoughts.
-- **Hard line break** (end a line with a backslash `\` or two trailing
-  spaces, which CommonMark renders as `<br>`) → the following line is
-  indented 2.5em with **no** vertical gap — continuous prose, book style.
+- **A single newline, with no blank line** (a plain line wrap in the
+  source — CommonMark's "soft break" — OR an explicit hard break: end a
+  line with a backslash `\` or two trailing spaces, which CommonMark
+  renders as `<br>`) → the following line is indented 2.5em with **no**
+  vertical gap — continuous prose, book style. Both spellings render
+  identically; write whichever is convenient. This means **prose must not
+  be hard-wrapped** unless every wrap is meant to become an indent — see
+  `content/essays/typography.md` and `content/about.md`, which are kept
+  unwrapped (one paragraph per source line) for exactly this reason.
 
 Mechanically: `sass/_typography.scss` gives every `<p>` `text-indent: 0`
 and puts the gap on `p + p` (one line-height). The indent comes from a
 `.para-indent` marker span (`display: inline-block; width: 2.5em`)
-inserted right after each `<br>` at runtime by
-`static/js/mark-para-indent.js` (pure logic in
-`static/js/lib/para-indent.js`) — `text-indent` can't do this alone,
-because `each-line` would also indent the paragraph's own first line,
-which the flush-break case forbids, and a `::before`/`::after` on `<br>`
-itself does not render in any browser tested.
+inserted at runtime by `static/js/mark-para-indent.js` (pure logic in
+`static/js/lib/para-indent.js`) right after every hard break, AND after
+every plain newline it finds inside an `.article-body` `<p>` (skipping a
+newline right at the start or end of the paragraph, or one that would
+straddle a blank line) — `text-indent` can't do this alone, because
+`each-line` would also indent the paragraph's own first line, which the
+flush-break case forbids, and a `::before`/`::after` on `<br>` itself does
+not render in any browser tested.
 
-**No-JS degradation:** the `<br>` itself is server-rendered by Zola, so
-the line break always happens. Only the indent is JS-dependent; without
-it, a hard-break continuation reads as a flush line directly under the
-one above, with no visual distinction from a wrapped line.
+**No-JS degradation, and it is not the same for the two spellings:**
+
+- A **hard break** (`\` or two trailing spaces) is server-rendered by
+  Zola as a real `<br>`, so the line break always happens. Only the
+  indent is JS-dependent; without it, the continuation reads as a flush
+  line directly under the one above, with no visual distinction from a
+  wrapped line.
+- A **soft break** (plain newline, no backslash) is not turned into a
+  `<br>` by Zola at all — it stays a literal newline character inside the
+  `<p>`'s text, and default CSS whitespace handling renders that as an
+  ordinary space. Without JS there is no break and no indent: the two
+  source lines simply read as one continuous, wrapped sentence. Nothing
+  disappears and no text is lost — the site remains fully readable with
+  JS off, it just loses the indent/gap distinction between paragraph
+  styles.
 
 ### Templates
 

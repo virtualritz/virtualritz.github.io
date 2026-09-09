@@ -14,12 +14,16 @@ const src = () =>
     "utf8",
   );
 
-test("no-ops when .article-body is missing or has no <br>", () => {
+test("no-ops when .article-body is missing or has no <p>", () => {
   const s = src();
+  // The guard is on <p>, not <br>: a plain soft break (a bare newline
+  // inside a <p>, with no <br> anywhere on the page) must still trigger
+  // the rewrite, so gating on an existing <br> would silently skip pages
+  // that use only soft breaks.
   assert.match(
     s,
-    /if\s*\(\s*body\s*&&\s*body\.querySelector\(\s*["']br["']\s*\)\s*\)/,
-    "must guard on both .article-body and the presence of at least one <br>",
+    /if\s*\(\s*body\s*&&\s*body\.querySelector\(\s*["']p["']\s*\)\s*\)/,
+    "must guard on both .article-body and the presence of at least one <p>",
   );
 });
 

@@ -15,17 +15,22 @@
  * typography.js's header comment (justif has no second pass).
  *
  * No-op (per project convention) when .article-body is absent or contains
- * no `<br>` at all — including every non-essay page and every essay
- * written without a hard line break. Never throws: a failure here must
- * not stall `paraIndentMarked`, which typography.js awaits before
- * markPunctuation/justify — see the ordering invariant in typography.js's
- * header comment.
+ * no `<p>` at all — including every non-essay page. The guard used to
+ * check for an existing `<br>` instead, back when only an authored hard
+ * break could produce an indented continuation; now a plain soft break
+ * (a bare newline inside a `<p>`, with no `<br>` anywhere on the page)
+ * must also trigger the rewrite, so the guard is on `<p>` — the actual
+ * scope insertParaIndentMarkers operates on — rather than on the
+ * mechanism one particular page happens to use. Never throws: a failure
+ * here must not stall `paraIndentMarked`, which typography.js awaits
+ * before markPunctuation/justify — see the ordering invariant in
+ * typography.js's header comment.
  */
 import { insertParaIndentMarkers } from "./lib/para-indent.js";
 
 try {
   const body = document.querySelector(".article-body");
-  if (body && body.querySelector("br")) {
+  if (body && body.querySelector("p")) {
     body.innerHTML = insertParaIndentMarkers(body.innerHTML);
   }
 } catch (err) {

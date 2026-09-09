@@ -1,8 +1,11 @@
 // gwern.net's technique, measured: a 2px dotted gradient underline plus
 // seven zero-blur text-shadows in the page ground, which cut the
-// underline around descenders. Zero blur and vertical-only offsets
-// matter: justif treats a blurred shadow as a halo and stops protruding
-// glyphs through it.
+// underline around descenders. Zero blur matters: justif treats a
+// blurred shadow as a halo and stops protruding glyphs through it. The
+// horizontal offsets below (±0.05em, ±0.16em) are required for the
+// descender cutout, not incidental, and were measured not to suppress
+// protrusion (T 2.41px, W 1.05px on the real essay) — do not flatten
+// them to vertical-only.
 .article-body a {
   color: var(--link);
   text-decoration: none;

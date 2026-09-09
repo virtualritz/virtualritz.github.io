@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { buildSite } from "./helpers/build.mjs";
 
-test("site builds and emits the essay", async () => {
+test("site builds and honours draft = true by omitting the page", async () => {
   const site = await buildSite();
-  assert.ok(site.exists("essays/nsi-vs-hydra-vs-riley/index.html"));
+  assert.ok(site.exists("essays/typography/index.html"));
+  assert.ok(!site.exists("essays/nsi-vs-hydra-vs-riley/index.html"));
 });
 
 test("zola is new enough to collect footnotes", () => {

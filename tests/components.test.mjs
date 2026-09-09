@@ -35,7 +35,7 @@ test("every section and taxonomy page builds", async () => {
     "essays/index.html",
     "projects/index.html",
     "tags/index.html",
-    "tags/rendering/index.html",
+    "tags/typography/index.html",
   ]) {
     assert.ok(site.exists(p), `missing ${p}`);
   }
@@ -43,21 +43,19 @@ test("every section and taxonomy page builds", async () => {
 
 test("section listing shows dates and descriptions", async () => {
   const html = (await buildSite()).read("essays/index.html");
-  assert.match(html, /Hydra, NSI and Riley/);
+  assert.match(html, /Setting this site/);
   assert.match(html, /<time/);
 });
 
 test("the dek keeps the TL;DR out of .article-body's direct-child paragraphs, so the standfirst gets the drop cap", async () => {
   // static/js/dropcaps.js places the drop cap on `.article-body > p`, the
-  // first paragraph that is a *direct child* of .article-body. The essay
-  // opens with a short "TL;DR:" line wrapped in the `dek` component
+  // first paragraph that is a *direct child* of .article-body. The demo
+  // essay opens with a short "TL;DR:" line wrapped in the `dek` component
   // specifically so it does not become that direct child — otherwise the
   // cap would try (and fail, being too short to host it) to attach there,
   // and the essay would silently lose its drop cap. This must never
   // regress back to a plain paragraph.
-  const html = (await buildSite()).read(
-    "essays/nsi-vs-hydra-vs-riley/index.html",
-  );
+  const html = (await buildSite()).read("essays/typography/index.html");
   const bodyIdx = html.indexOf('<div class="article-body">');
   assert.ok(bodyIdx >= 0, "essay must have an .article-body");
   const body = html.slice(bodyIdx);
@@ -77,7 +75,7 @@ test("the dek keeps the TL;DR out of .article-body's direct-child paragraphs, so
   );
   assert.match(
     match[1],
-    /architectural review/,
+    /drop cap reserves/,
     "the first .article-body > p must be the standfirst",
   );
 });

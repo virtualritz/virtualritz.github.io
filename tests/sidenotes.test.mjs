@@ -119,9 +119,7 @@ test('isBackrefFor\'s trailing dash guards label "1" against label "10"\'s backr
 test("page.html carries both sidenote columns inside #article", async () => {
   // Every essay uses page.html; none needs footnotes to prove the shell
   // is wired up.
-  const html = (await buildSite()).read(
-    "essays/nsi-vs-hydra-vs-riley/index.html",
-  );
+  const html = (await buildSite()).read("essays/typography/index.html");
   const article = html.match(
     /<article id="article"[^>]*>([\s\S]*)<\/article>/,
   )[1];

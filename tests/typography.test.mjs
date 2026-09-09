@@ -84,9 +84,7 @@ test("code inside <pre> keeps overflow-wrap normal (pre has its own scroll conta
 });
 
 test("the essay renders its title once, from frontmatter", async () => {
-  const html = (await buildSite()).read(
-    "essays/nsi-vs-hydra-vs-riley/index.html",
-  );
+  const html = (await buildSite()).read("essays/typography/index.html");
   assert.equal((html.match(/<h1/g) || []).length, 1);
-  assert.match(html, /Hydra, NSI and Riley/);
+  assert.match(html, /Setting this site/);
 });

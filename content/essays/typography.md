@@ -7,6 +7,10 @@ description = "How the type on this site is set, and the measurements behind it.
 tags = ["typography", "web"]
 +++
 
+{% <dek> %}
+TL;DR: every typographic device this site has, gathered on one page, so a regression is visible immediately.
+{% </dek> %}
+
 _Every typographic device this site has, on one page, so a change that breaks one of them is visible immediately. The opening paragraph runs to at least three lines on purpose: that is the depth the drop cap reserves, and a shorter one would leave the initial overhanging into whatever follows it._
 
 ---

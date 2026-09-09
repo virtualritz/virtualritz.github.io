@@ -454,3 +454,238 @@ visually verify:
   above, not an observed real-world race.
 
 These are exactly the items flagged for your browser sweep.
+
+---
+
+## Third iteration: breaking the measurement cycle by detaching the TOC first — 2026-09-09
+
+### The bug this time
+
+Both earlier fixes still measured the candidate paragraph's fit while
+`#toc` was in its _original_ template position — `float: left`, a
+preceding sibling of `.article-body` — because `dropcaps.js`'s candidate
+loop ran, and finished, before `toc-move.js` ever touched the DOM
+(`toc-move.js`'s move awaited `capPlaced`, i.e. ran _after_ it). That
+intruding float squeezes whatever paragraph follows it into more lines
+than it actually needs, so a cap that measured as fitting a 2-line
+paragraph (measured: host height 76px) actually overhung once `toc-move.js`
+moved the TOC away and the paragraph reflowed back down (measured
+overhang: 38px, a full line — `hostIndex: 0`, i.e. the cap landed back on
+the "TL;DR:" opener the previous fix was supposed to skip). The cap's
+placement depended on the TOC's position, and the TOC's position depended
+on the cap's placement — a genuine measurement cycle, not fixable by
+picking a different anchor, since every anchor choice is downstream of a
+measurement taken at the wrong moment.
+
+### The fix: three phases, TOC out of the flow before anything measures
+
+1. **Detach** (`toc-move.js`, synchronous, at module evaluation): pull
+   `#toc` out of the document entirely via `toc.remove()`, before any
+   other module has a chance to measure a paragraph. Guarded on
+   `firstPara` existing (see "TOC never lost" below).
+2. **Measure and place the cap** (`dropcaps.js`, unchanged
+   place-measure-undo logic, now running against clean, TOC-free layout).
+3. **Re-insert** (`toc-move.js`): once `capPlaced` resolves, insert `#toc`
+   immediately after the cap's host paragraph, or after the essay's first
+   paragraph when no cap was placed.
+
+`toc-move.js` exports two promises making each boundary explicit:
+`tocDetached` (phase 1, always `Promise.resolve()` since the detach above
+it is itself synchronous) and `tocMoved` (phase 3, as before).
+`dropcaps.js` imports `tocDetached` and chains `capPlaced`'s whole pipeline
+off it, before the `waitForBox`/`place()` calls that do the actual
+measuring.
+
+### Why this is acyclic (verified, not assumed)
+
+The _promise dependency graph_ is a straight line:
+`tocDetached → (cap measurement) → capPlaced → tocMoved`. `tocDetached`
+needs nothing from `dropcaps.js`; `capPlaced` needs `tocDetached`;
+`tocMoved` needs `capPlaced`. No promise anywhere awaits something that
+(transitively) awaits it back.
+
+The _ES-module import graph_, however, does have a cycle:
+`dropcaps.js` imports `tocDetached` from `toc-move.js`, and `toc-move.js`
+imports `capPlaced` from `dropcaps.js`. I traced this by hand against the
+ES module evaluation algorithm (imports fully evaluate the target module,
+including circular re-entries, before the importing module's own
+top-level code continues) rather than assuming the task's "no cycle"
+framing meant no module-graph edge at all:
+
+- `typography.js` imports `dropcaps.js` before `toc-move.js`, so
+  `dropcaps.js` is the module that "enters" the cycle. When its import of
+  `toc-move.js` triggers `toc-move.js`'s evaluation, `toc-move.js` in turn
+  hits its own `import { capPlaced } from "./dropcaps.js"` — circular,
+  so the loader links the binding without re-evaluating, and `capPlaced`
+  is still in the temporal dead zone (dropcaps.js hasn't reached that line
+  yet).
+- If `toc-move.js`'s `export const tocMoved = moveToc();` called
+  `moveToc()` synchronously right there (as the pre-existing code did),
+  `moveToc`'s first `await capPlaced` would evaluate the identifier
+  `capPlaced` as part of building the `await` expression — a synchronous
+  read, before any suspension — and throw a `ReferenceError` from the
+  TDZ. That throw lands inside `moveToc`'s own `try`/`catch` around that
+  await, so it wouldn't crash, but it _would_ silently and permanently
+  treat `capPlaced` as rejected, defeating the whole anchor-on-host fix
+  every single time.
+- Fix: `export const tocMoved = Promise.resolve().then(moveToc);` defers
+  the call to a microtask. Microtasks only run after the _entire_
+  currently-executing synchronous job finishes — which includes the whole
+  static module graph's evaluation, cycle and all — so by the time
+  `moveToc` actually runs, `dropcaps.js` has long since defined
+  `capPlaced`.
+- Symmetrically, I deferred `dropcaps.js`'s read of `tocDetached` the same
+  way (`Promise.resolve().then(() => tocDetached).then(...)` rather than
+  reading `tocDetached` inline) so the code doesn't silently depend on
+  `dropcaps.js` being imported before `toc-move.js` forever — a future
+  reordering of `typography.js`'s two import lines would otherwise crash
+  the whole module graph outright (an uncaught TDZ `ReferenceError`, not
+  even a swallowed one), which is exactly the kind of "incidental to
+  import order" fragility the task asked me to avoid.
+
+I confirmed this by literally breaking each side (see "Teeth" below) and
+by running the full test suite with the real code, which requires the
+cycle to resolve cleanly on every module load, not just once.
+
+### How the TOC is guaranteed never lost
+
+- The detach (`if (toc && firstPara) toc.remove();`) only runs when
+  `firstPara` exists — with no paragraph at all, `tocAnchor` can never
+  resolve to anything (`capHost ?? firstPara ?? null` with both null),
+  so removing `#toc` would strand it with nowhere to go. In that case
+  `tocDetached` still resolves (there's nothing to await for) but nothing
+  is ever removed, matching "strict no-op ... no paragraphs".
+- `moveToc()`'s `await capPlaced` is wrapped in `try`/`catch`: a rejection
+  falls back to `capHost = null`, so `tocAnchor` still resolves to
+  `firstPara`.
+- The actual DOM insertion has two fallback layers: `anchor.after(toc)`
+  is wrapped in `try`/`catch`; if it throws, `firstPara.after(toc)` is
+  tried; if _that_ throws too, `document.querySelector(".article-body")
+?.append(toc)` is the last resort. Every one of these three attempts
+  targets a node that is either the resolved anchor, the always-present
+  first paragraph, or `.article-body` itself — `#toc` ends up back in the
+  document on every code path short of `.article-body` itself having been
+  removed from the page entirely (a case beyond what any DOM move can
+  recover from).
+- Both `tocDetached` and `tocMoved` are plain `Promise.resolve()`/
+  `.then()` chains with no unbounded awaits of their own — `tocDetached`
+  can't hang since the detach it stands for is synchronous, and
+  `tocMoved`'s only await (`capPlaced`) is already documented and
+  unit-tested to always settle (bounded by dropcaps.js's font-load-vs-2s-
+  timeout race, unchanged from before).
+
+### Comments corrected
+
+Rewrote the header comments in `static/js/toc-move.js` (full rewrite:
+history of the two earlier fixes, the measurement-cycle diagnosis, the
+three-phase design, the import-cycle/TDZ reasoning, the never-lost
+guarantee) and `static/js/dropcaps.js` (added the "must run after
+`tocDetached`" section explaining why measuring before the TOC moves away
+is wrong, and why `capPlaced` defers its read of `tocDetached` to a
+microtask). Updated `static/js/typography.js`'s "Ordering invariant"
+paragraph to describe the three-phase sequence instead of the old
+two-party (`capPlaced`/`tocMoved`) framing. Updated `static/js/main.js`'s
+load-order comment to mention the `dropcaps.js`/`toc-move.js` mutual
+import. Re-read `static/js/mark-para-indent.js` and
+`static/js/mark-long-tokens.js` in full: their claims ("must run before
+`dropcaps.js`/`toc-move.js` touch `.article-body`'s HTML") are unaffected
+by this change — the wholesale-innerHTML-rewrite-must-come-first ordering
+they document doesn't interact with when the TOC gets detached — so
+neither file needed edits.
+
+### Tests
+
+Updated `tests/toc-move.test.mjs`'s stale source-pinning assertion
+(`if (!toc) return;`, `if (anchor) anchor.after(toc);`) to match the new
+guard shape (`if (!toc || !firstPara) return;`) and added:
+
+- `toc-move.js detaches #toc synchronously, at module evaluation, not
+inside an async function` — pins the detach as a column-0 statement
+  (`/^if \(toc && firstPara\) toc\.remove\(\);$/m`) preceding `moveToc`'s
+  definition, and that `tocDetached` is a bare `Promise.resolve()`.
+- `dropcaps.js awaits tocDetached before it measures anything` — pins
+  that `capPlaced`'s chain reads `tocDetached` before it calls
+  `waitForBox`/`place`.
+- `the TOC is re-inserted even when capPlaced rejects` (replaces the
+  previous iteration's equivalent test, updated for the new code shape).
+- `the TOC is re-inserted even when the anchored insertion itself throws`
+  — pins the two-level fallback (`firstPara.after(toc)`, then
+  `.article-body`'s `append`).
+
+**Baseline for this iteration: 154 passing. New count: 157 passing**
+(154 baseline + 4 new tests − 1 old test folded into an updated
+equivalent = net +3).
+
+```
+$ npm test
+...
+# tests 157
+# suites 0
+# pass 157
+# fail 0
+```
+
+### Teeth (break → fail → restore, working tree clean before and after each)
+
+Backed up both files to the scratchpad before starting; every restore
+below was verified byte-identical via `diff`.
+
+1. **Detach-before-measure**: reverted `dropcaps.js`'s `capPlaced` to the
+   pre-fix `waitForBox(...).then(...)` (no `tocDetached` in the chain) →
+   `dropcaps.js awaits tocDetached before it measures anything` failed
+   (5 pass / 1 fail on `tests/toc-move.test.mjs`). Restored.
+2. **Guaranteed re-insertion on `capPlaced` rejection**: removed the
+   `try`/`catch` around `await capPlaced` in `moveToc()` → `the TOC is
+re-inserted even when capPlaced rejects` failed (5/1). Restored.
+3. **Guaranteed re-insertion on a throwing anchor move**: removed the
+   nested `try`/`catch`/fallback around `anchor.after(toc)`, leaving a
+   bare `anchor.after(toc);` → `the TOC is re-inserted even when the
+anchored insertion itself throws` failed (5/1). Restored.
+4. **Synchronous detach**: wrapped the detach in
+   `tocDetached = Promise.resolve().then(() => { if (toc && firstPara)
+toc.remove(); })` (deferring it to a microtask) → `toc-move.js detaches
+#toc synchronously...` failed (5/1) once the test was tightened to
+   check column-0 placement (an earlier, looser regex missed this
+   break entirely — corrected before relying on it). Restored.
+
+Full suite after all four restores: `npm test` → 157/157. `node --check`
+on all four changed `.js` files confirms no syntax errors.
+
+### Build
+
+```
+$ zola build
+Building site...
+-> Creating 4 pages (0 orphan) and 2 sections
+Done in 33ms.
+
+$ zola check --skip-external-links
+Checking site...
+-> Site content: 4 pages (0 orphan), 2 sections
+Done in 36ms.
+```
+
+Both clean.
+
+### What I inspected in the built HTML (no browser available)
+
+- `/essays/nsi-vs-hydra-vs-riley/`: `<article id="article" class="essay">`
+  and `<nav id="toc" aria-label="Contents">` both present; `.article-body`
+  opens `<p>TL;DR: ...</p><p><em>An architectural review...` — same shape
+  as the previous iteration's inspection, confirming the structural setup
+  this fix targets is still present in the built output.
+
+### What I could not confirm
+
+Per the task's constraint, I cannot drive a browser, so — as flagged
+explicitly in the task itself — I could not verify the one thing that
+actually matters: that text visibly wraps beside the drop cap on all four
+page types (an essay with a short lead-in like NSI, an essay with a plain
+long opener, the demo typography essay, and `/about/` with no cap/TOC at
+all), and that the TOC itself renders in the right place with no overhang.
+Everything above is structural/source-level verification (the promise
+graph resolves correctly, the DOM operations happen in the right order,
+the fallbacks fire when broken) plus confirmation that the pre-existing
+`capOverhangsParagraph` unit tests (pinning the exact 76px/113.8px/38px
+numbers from your browser measurement) still pass unchanged. This is
+exactly the browser sweep you said you'd do.

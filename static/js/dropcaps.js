@@ -17,11 +17,28 @@
  * layout box first, same as justif: computed font-size/line-height are
  * unreliable before styles have applied.
  *
- * Must also run before toc-move.js relocates `#toc`: the TOC is a
- * preceding-sibling float that must land after whichever paragraph ends
- * up hosting the cap, not always the first one (see toc-move.js's header
- * comment), so toc-move.js awaits `capPlaced` and reads the paragraph it
- * resolves with.
+ * Must also run *after* toc-move.js's phase 1 detach (`tocDetached`,
+ * awaited below) — see that file's header comment for the full three-
+ * phase design and why. In short: `#toc` is a preceding-sibling float
+ * that intrudes into whatever paragraph follows it in DOM order, so
+ * measuring a candidate paragraph's fit while `#toc` is still in its
+ * template position (still floated left, ahead of `.article-body`)
+ * measures a squeezed, artificially-shorter layout — a cap that looks
+ * like it fits there can overhang once `#toc` actually moves away and the
+ * paragraph reflows back to its true height (measured: a 2-line paragraph
+ * against a 3-line cap, 38px/a full line of overhang). Awaiting
+ * `tocDetached` first guarantees every measurement below happens against
+ * clean, TOC-free layout, so the candidate loop's own place-measure-undo
+ * check (`tryPlaceCap`) is judging the paragraph's real, final height.
+ *
+ * toc-move.js's *re-insertion* (phase 3) runs the other way around: it
+ * awaits this file's `capPlaced` to learn which paragraph to anchor `#toc`
+ * after, not always the first one (see toc-move.js's header comment and
+ * dropcap-candidates.js). That, plus this file awaiting `tocDetached`,
+ * makes the two files import each other — see toc-move.js's header
+ * comment for why that's a real ES-module cycle but not a circular data
+ * dependency, and why `capPlaced` below defers its read of `tocDetached`
+ * to a microtask rather than reading it inline.
  */
 import { waitForBox } from "./lib/wait-for-box.js";
 import {
@@ -35,6 +52,7 @@ import {
   MAX_DROPCAP_CANDIDATES,
   selectDropcapCandidates,
 } from "./lib/dropcap-candidates.js";
+import { tocDetached } from "./toc-move.js";
 
 const LINES = 3;
 const CAP_DROP_PCT = 3;
@@ -324,8 +342,16 @@ const article = document.querySelector("#article.essay");
 // does its own explicit font loading (document.fonts.ready doesn't cover
 // faces nothing else on the page has requested yet — see the comment
 // above).
+//
+// Reads `tocDetached` from inside the first `.then()`, not inline in this
+// ternary, so the read happens on a microtask rather than during this
+// module's own synchronous evaluation — see toc-move.js's header comment
+// on why the two files' mutual import needs that deferral on at least one
+// side, and why doing it on both sides makes this safe regardless of
+// which of the two files ES modules happen to evaluate first.
 export const capPlaced = article
-  ? waitForBox(".article-body > p").then((found) =>
-      found ? place(article) : null,
-    )
+  ? Promise.resolve()
+      .then(() => tocDetached)
+      .then(() => waitForBox(".article-body > p"))
+      .then((found) => (found ? place(article) : null))
   : Promise.resolve(null);

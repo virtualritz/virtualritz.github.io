@@ -159,6 +159,11 @@
   .sg {
     padding-inline-end: var(--sentence-gap);
   }
+
+  .small-caps {
+    font-variant: small-caps;
+    letter-spacing: 0.02em;
+  }
 }
 
 .article-meta {

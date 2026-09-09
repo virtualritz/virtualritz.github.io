@@ -10,10 +10,16 @@
 
 // TeX's rule: a period after a lowercase letter or digit ends a sentence;
 // after a capital it is an initial. These are the exceptions.
+// Curly quotes use \u escapes (not literal characters) because the write path
+// normalizes them; escapes are immune. Straight quotes are kept for backward
+// compat with plain-text content lacking Zola's smart_punctuation.
 const ABBR =
-  /(?:^|[\s("'"'"])(?:Mr|Mrs|Ms|Dr|Prof|St|Jr|Sr|vs|cf|etc|Fig|No|Vol|Ed|pp|al|Inc|Ltd|Co|ca|approx|[A-Za-z]\.[A-Za-z])$/;
+  /(?:^|[\s("\u201c\u2018'])(?:Mr|Mrs|Ms|Dr|Prof|St|Jr|Sr|vs|cf|etc|Fig|No|Vol|Ed|pp|al|Inc|Ltd|Co|ca|approx|[A-Za-z]\.[A-Za-z])$/;
 
-const SENTENCE = /([a-z0-9)\]"'"'])([.!?])([""')\]]?)(?=[ \u00a0]+[A-Z""'('])/g;
+// Escapes: \u201c=", \u201d=", \u2018=', \u2019='
+// Character classes include both curly and straight quotes for robustness.
+const SENTENCE =
+  /([a-z0-9)\]"\u201d\u2019''])([.!?])(["\u201d\u2019')\]]?)(?=[ \u00a0]+[A-Z"\u201c\u2018(''])/g;
 
 /** Offsets of sentence-terminating punctuation runs in `text`. */
 export function findSentenceEnds(text) {

@@ -34,3 +34,28 @@ test("a sentence end needs a following capital", () => {
 test("digits can end a sentence", () => {
   assert.deepEqual(ends("counted to 10. Then stopped"), ["."]);
 });
+
+test("sentence ends are found next to curly quotes", () => {
+  const s =
+    "He said " +
+    String.fromCharCode(0x201c) +
+    "no." +
+    String.fromCharCode(0x201d) +
+    " Then left";
+  assert.deepEqual(
+    findSentenceEnds(s).map((c) => s.slice(c.start, c.start + c.len)),
+    ["." + String.fromCharCode(0x201d)],
+  );
+});
+
+test("sentence ends before opening curly quotes", () => {
+  const s =
+    "It ended. " +
+    String.fromCharCode(0x201c) +
+    "Next one starts." +
+    String.fromCharCode(0x201d);
+  assert.deepEqual(
+    findSentenceEnds(s).map((c) => s.slice(c.start, c.start + c.len)),
+    ["."],
+  );
+});

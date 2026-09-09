@@ -4,6 +4,8 @@ page.description }}{% elif page.summary %}{{ page.summary | striptags }}{% else
 %}{{ config.description }}{% endif %}{% endblock description %} {% block content
 %}
 <article id="article" class="essay">
+  <div id="sidenote-column-left" aria-hidden="true"></div>
+  <div id="sidenote-column-right" aria-hidden="true"></div>
   <header>
     <h1>{{ page.title }}</h1>
     <div class="article-meta">

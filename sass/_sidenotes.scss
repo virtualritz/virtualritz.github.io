@@ -1,1 +1,40 @@
-// filled in by a later task
+// #sidenote-column-left/right (sass/_layout.scss) and each hoisted
+// .sidenote within them are position:absolute, so both need a positioned
+// ancestor. That's #article rather than main: main also contains the
+// site nav above the article, so a column's top:0 there would not line
+// up with #article's own top edge, which is what sidenotes.js measures
+// reference offsets against.
+#article {
+  position: relative;
+}
+
+.sidenote {
+  position: absolute;
+  width: 100%;
+  font-size: 0.7em;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: left;
+  hyphens: auto;
+
+  p {
+    margin: 0;
+    text-indent: 0;
+  }
+  p + p {
+    margin-top: 0.5em;
+  }
+}
+
+.sidenote-number {
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--ink);
+  margin-right: 0.4em;
+}
+
+// Zola's collected footnote list is the no-JS fallback; it is hidden only
+// once notes have actually been hoisted into the margins.
+.has-sidenotes .footnotes[hidden] {
+  display: none;
+}

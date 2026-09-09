@@ -37,20 +37,24 @@
  * 0.9.1's current behaviour of turning internal errors into a rejected
  * controller.ready.
  *
- * mark-para-indent.js's `paraIndentMarked` joins the same pre-justify
- * await for the same "no second pass" reason, but it is imported ahead of
- * dropcaps.js and toc-move.js below (not just awaited alongside them):
- * it rewrites .article-body's innerHTML wholesale, which must happen
- * before either of them touches that subtree — see mark-para-indent.js's
- * header comment. Import position, not just await position, is what
- * gives it that ordering: ES modules evaluate each import's top-level
- * body, in source order, before the importing module's own body runs.
+ * mark-para-indent.js's `paraIndentMarked` and mark-long-tokens.js's
+ * `longTokensMarked` join the same pre-justify await for the same "no
+ * second pass" reason, but both are imported ahead of dropcaps.js and
+ * toc-move.js below (not just awaited alongside them): each rewrites
+ * .article-body's innerHTML wholesale, which must happen before either
+ * dropcaps.js or toc-move.js touches that subtree — see their own header
+ * comments. (The two rewrites don't interact with each other: one edits
+ * <p> text around <br>/newlines, the other edits text inside <code>.)
+ * Import position, not just await position, is what gives them that
+ * ordering: ES modules evaluate each import's top-level body, in source
+ * order, before the importing module's own body runs.
  */
 import { justify, hangingCharacters } from "./lib/justif/index.js";
 import { hyphenateEnUS } from "./lib/justif/hyphenate/en-us.js";
 import { markPunctuation } from "./lib/punctuation.js";
 import { waitForBox } from "./lib/wait-for-box.js";
 import { paraIndentMarked } from "./mark-para-indent.js";
+import { longTokensMarked } from "./mark-long-tokens.js";
 import { capPlaced } from "./dropcaps.js";
 import { tocMoved } from "./toc-move.js";
 
@@ -74,9 +78,14 @@ async function run() {
     if (!body) return resolveReady();
 
     // Must come before markPunctuation/justify — see the ordering
-    // invariant in the header comment. All three are no-ops on non-essay
+    // invariant in the header comment. All four are no-ops on non-essay
     // pages.
-    await Promise.all([capPlaced, tocMoved, paraIndentMarked]);
+    await Promise.all([
+      capPlaced,
+      tocMoved,
+      paraIndentMarked,
+      longTokensMarked,
+    ]);
 
     markPunctuation(body);
 

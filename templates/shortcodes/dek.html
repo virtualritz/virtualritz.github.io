@@ -1,0 +1,18 @@
+{# See templates/shortcodes/admonition.html for why this is a Tera component
+rather than a Zola shortcode. Usage from content: {%
+<dek> %} Body text, rendered as markdown. {% </dek> %} A "dek" is a short
+lead-in set above an essay's standfirst (the italic paragraph that follows it) —
+e.g. a one-line "TL;DR:". It exists to solve a layout problem, not a
+copy-editing one: static/js/dropcaps.js places the drop cap on the essay's first
+paragraph that is a direct child of .article-body, and places no cap at all if
+that paragraph is too short to host the cap's full depth. A bare "TL;DR:"
+paragraph is exactly that too-short paragraph, and left as a plain paragraph it
+would become the direct child the cap tries (and fails) to sit on, silently
+killing the drop cap for the whole essay. Wrapping it in this component's own
+container element makes its rendered paragraph a descendant of .article-body
+rather than a direct child, so the direct-child selector skips over it and lands
+on the standfirst below — the paragraph that actually fits the cap. Do not
+"simplify" this back into a plain paragraph; that reintroduces the
+missing-drop-cap bug. #} {% component dek() %}
+<div class="dek">{{ body | markdown | safe }}</div>
+{% endcomponent dek %}

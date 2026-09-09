@@ -53,12 +53,14 @@ This is a Zola static site generator project with gwern.net-inspired typography:
     are global once parsed regardless of which file defines them. Defined
     with `{% component name(...) %}...{% endcomponent name %}`; invoked
     from content with a body as `{% <name arg="val"> %}body{% </name> %}`.
-    All three current components (`admonition`, `collapse`, `marginnote`)
-    unconditionally dereference `body`, so all three require the body
-    form - the self-closing `{{<name .../>}}` form (valid Tera syntax for
-    a component that doesn't use `body`) is not usable with any component
-    currently defined in this project. Kept under `shortcodes/` only by
-    convention, not because Zola looks there specifically.
+    All four current components (`admonition`, `collapse`, `marginnote`,
+    `dek`) unconditionally dereference `body`, so all four require the
+    body form - the self-closing `{{<name .../>}}` form (valid Tera
+    syntax for a component that doesn't use `body`) is not usable with
+    any component currently defined in this project. Kept under
+    `shortcodes/` only by convention, not because Zola looks there
+    specifically.
+    - **dek** - a short lead-in set above an essay's standfirst (e.g. a one-line "TL;DR:"), used in `content/essays/nsi-vs-hydra-vs-riley.md`. It exists to solve a layout bug, not a copy-editing preference: `dropcaps.js` places the drop cap on the first paragraph that is a direct child of `.article-body`, and places no cap at all if that paragraph is too short to host the cap's full depth. A bare "TL;DR:" line is exactly that too-short paragraph - left as a plain paragraph, it (not the standfirst below it) becomes the direct-child paragraph the cap tries and fails to attach to, silently losing the drop cap for the whole essay. `dek` wraps its body in its own container element, so the paragraph it renders is a descendant of `.article-body` rather than a direct child, and the direct-child selector skips over it and lands on the standfirst instead, which fits the cap. Do not simplify a `dek` back into a plain paragraph - that reintroduces the missing-drop-cap regression (previously "fixed", then reverted, at commits `ab45802`/`9951ceb`/`acab0ba`, by teaching the cap itself to walk forward to a paragraph that fits; that approach broke justif's text-wrap around the cap and was reverted in favour of this content-side fix). `tests/components.test.mjs` asserts the invariant that must never regress: the essay's first direct-child paragraph of `.article-body` is the standfirst, never the TL;DR.
 - **sass/** - Stylesheet partials (`_tokens.scss` design tokens, `_typography.scss`,
   `_layout.scss`, `_components.scss`, etc.), assembled by `style.scss` and compiled
   by Zola

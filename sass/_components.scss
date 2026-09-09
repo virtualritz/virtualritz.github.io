@@ -61,6 +61,26 @@ details.collapse {
   color: var(--muted);
 }
 
+// A short lead-in above an essay's standfirst (e.g. "TL;DR:"). Sans-serif
+// and muted, like .article-meta and .admonition-label, so it reads as
+// secondary front matter rather than a normal body paragraph or the
+// italic standfirst below it — no border or background, this site does
+// not put body content in boxes. See templates/shortcodes/dek.html for
+// why this exists as a component at all: it keeps the paragraph it wraps
+// from being .article-body's direct-child first paragraph, which is what
+// the drop cap attaches to.
+.dek {
+  font-family: var(--sans);
+  font-size: 0.86em;
+  color: var(--muted);
+  margin: 0 0 calc(var(--body-lh) * 1em);
+
+  p {
+    text-indent: 0;
+    margin: 0;
+  }
+}
+
 .post-list {
   list-style: none;
   margin: 2em 0 0;

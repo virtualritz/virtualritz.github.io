@@ -7,7 +7,9 @@ description = "An architectural review of Hydra and NSI, with Pixar's Riley as a
 tags = ["rendering", "api-design", "openusd", "renderman", "nsi", "architecture"]
 +++
 
+{% <dek> %}
 TL;DR: Hydra is ~~crap~~ a bad choice if you need to send data from a digital content creation app (DCC, e.g. Maya, Blender) to a renderer.
+{% </dek> %}
 
 _An architectural review for people who write [offline renderers](https://en.wikipedia.org/wiki/Offline_rendering), write exporters, or have to live with the result. It compares Hydra and [NSI](https://nsi.readthedocs.io) in detail, then uses Pixar's Riley as a control: it was built for the same job as NSI._
 

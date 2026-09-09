@@ -101,7 +101,9 @@ restated per-initial rather than as a general defect.
 
 ## Step 4 — optical margins, the axis meant to beat gwern.net
 
-**FAIL.** See FAIL 2.
+**PASS**, on every paragraph justif actually laid out. See the retracted FAIL 2
+below for the measurements and for the error in an earlier revision of this
+document, which recorded this as a failure.
 
 ## Failures
 
@@ -132,30 +134,61 @@ The remedy is a design decision, not a defect fix: either restructure the
 drop-cap markup so the floated element is a leading direct child of the
 paragraph, or abandon the float for a different placement technique.
 
-### FAIL 2 — optical-margin protrusion not observed
+### ~~FAIL 2 — optical-margin protrusion not observed~~ — RETRACTED, this was a measurement error
 
-**Load-bearing.**
+**Protrusion works.** An earlier revision of this document recorded it as a
+load-bearing failure. That was wrong, and the error was mine, twice over:
 
-The plan's Step 4 probe expects negative first-glyph offsets for paragraphs
-beginning with `T`, `V`, `W`, `Y` and opening quotes — glyphs protruding left
-of the column — and describes this as "the axis on which we beat
-gwern.net", which measures `0.00` for all of them.
+1. I compared the first glyph's offset against the paragraph's box and looked
+   for a **negative** number, ignoring that body paragraphs carry a 60px
+   (2.5em) `text-indent`. The correct baseline is the indent itself, so an
+   offset of `58.8` on a `60px` indent is **1.2px of protrusion**, not zero.
+2. My first probe ran on a page state where justif had not applied to
+   anything, so nothing could have protruded.
 
-Measured across all 13 `.article-body` paragraphs, offsets were only `0` or
-`60` (60px being the 2.5em `text-indent`). **Never negative.** So protrusion
-is either not applied or not taking effect.
+Re-measured with justification confirmed active, taking protrusion as
+`text-indent − offset` (positive = protruding left of the column):
 
-This is the outcome Task 5's escalation predicted was at risk: justif's own
-documentation promises glyph protrusion for "sharp (zero-blur) vertical-only
-underline shadows", while four of the seven link-underline shadows this
-plan ships carry deliberate horizontal offsets, because the descender-cutout
-effect requires them.
+| First glyph   | Protrusion | Justified |
+| ------------- | ---------- | --------- |
+| T             | **1.20px** | yes       |
+| T             | **1.20px** | yes       |
+| S             | **0.74px** | yes       |
+| A             | **0.44px** | yes       |
+| R             | 0          | yes       |
+| N             | 0          | yes       |
+| J             | −0.62px    | yes       |
+| A, A, O, B, F | 0          | **no**    |
 
-Whether those two facts are causally connected here is **not** established —
-protrusion is absent on paragraphs with no links at all, so there is likely a
-second, simpler cause (configuration, or protrusion needing a property this
-build does not set). Worth investigating before assuming the shadows are to
-blame.
+This is exactly the intended behaviour: pointed and round left-side glyphs
+(`T`, `S`, `A`) protrude, flat-stemmed ones (`R`, `N`) do not, and `J` — open
+on its left — correctly does not. gwern.net measures `0.00` for all of these,
+so the axis holds, if subtly (~1.2px at 24px type).
+
+Two things follow, both worth keeping:
+
+- **Protrusion only happens on paragraphs justif actually laid out.** Every
+  unjustified paragraph measures exactly `0`. So FAIL 1 is not merely about
+  line-breaking — it silently costs optical margins on every paragraph it
+  touches, which enlarges its blast radius.
+- **Task 5's escalation is discharged.** The worry was that our
+  link-underline shadows, four of which carry horizontal offsets, would make
+  justif treat the underline as a painted halo and suppress protrusion.
+  Protrusion is present, so that risk did not materialise.
+
+Independent corroboration on the options: justif's own
+`resolveOptions`/`composeProtrusion` were read directly (vendored
+`chunk-WWMSGT6G.js:504-538`, `index.js:4373-4399`). `protrusion: true` is
+equivalent to omitting the key, and `hangingPunctuation: "line-end-only"` is
+a recognised mode; the base Latin `T`/`V`/`W`/`Y` table is included
+regardless of hang mode. The call site's options were never the problem.
+
+Also worth recording, since it shaped the original expectation: the
+planning-phase specimen page never enabled `protrusion` and never measured
+it. The one "1131 blocks measured, offset 0" measurement in the planning
+record was of **gwern.net**, taken to justify choosing justif over CSS — not
+of this site. So "protrusion was working in the specimen" was inferred from
+justif being active, never demonstrated. It is demonstrated now, here.
 
 ### FAIL 3 — `justifSkipped` telemetry under-reports
 

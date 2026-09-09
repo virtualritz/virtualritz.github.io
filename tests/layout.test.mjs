@@ -20,7 +20,7 @@ test("TOC floats inside the article, not in a sidebar", async () => {
 
 test("sidenote columns only exist on very wide viewports", async () => {
   const css = (await buildSite()).read("style.css");
-  assert.match(css, /min-width:\s*1400px/);
+  assert.match(css, /min-width:\s*1560px/);
 });
 
 test("no element forces horizontal page scroll", async () => {

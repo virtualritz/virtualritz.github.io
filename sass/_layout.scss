@@ -45,6 +45,7 @@ main {
       }
     }
     ol {
+      counter-reset: toc;
       padding-left: 0.9em;
       margin-top: 0.3em;
     }
@@ -57,14 +58,16 @@ main {
   }
 }
 
-// Sidenote columns sit outside the measure and only appear when there is
-// genuinely room. Below this, the native footnote section is the fallback.
+// Sidenote columns sit outside the measure at 1560px minimum: the narrowest
+// viewport with room for a 260px column, a 30px gap, and the 935px main column
+// on each side (935 + 2×290 = 1515px, plus 22.5px slack per side = 1560px).
+// Below this, the native footnote section is the fallback.
 #sidenote-column-left,
 #sidenote-column-right {
   display: none;
 }
 
-@media (min-width: 1400px) {
+@media (min-width: 1560px) {
   #sidenote-column-left,
   #sidenote-column-right {
     display: block;

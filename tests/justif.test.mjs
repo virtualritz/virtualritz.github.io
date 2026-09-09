@@ -39,6 +39,18 @@ test("only the files justif's two entry points need are vendored", () => {
   );
 });
 
+test("the vendored module set is complete and imports cleanly", async () => {
+  // The chunk filenames are content-hashed, so file-existence checks alone
+  // cannot prove the vendored set is self-consistent. Actually importing it
+  // does: a missing transitive chunk fails here rather than silently in a
+  // browser.
+  const { justify } = await import("../static/js/lib/justif/index.js");
+  const { hyphenateEnUS } =
+    await import("../static/js/lib/justif/hyphenate/en-us.js");
+  assert.equal(typeof justify, "function");
+  assert.equal(typeof hyphenateEnUS, "function");
+});
+
 test("typography.js gates on a layout box and adds no ResizeObserver", () => {
   const src = readFileSync(root + "static/js/typography.js", "utf8");
   assert.match(

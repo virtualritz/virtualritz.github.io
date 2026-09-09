@@ -10,7 +10,9 @@
 # KiB total. The chunk filenames are content-hashed by justif's own build
 # and hardcoded here because we pin one exact version; re-run this script
 # after bumping V and re-check the imports in dist/index.js and
-# dist/hyphenate/en-us.js in case the hashes moved.
+# dist/hyphenate/en-us.js in case the hashes moved. tests/justif.test.mjs
+# actually imports the vendored set, so a stale/missing chunk after a
+# version bump fails the suite instead of only breaking in a browser.
 set -euo pipefail
 V=0.9.1
 DEST="static/js/lib/justif"

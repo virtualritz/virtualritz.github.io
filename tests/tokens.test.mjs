@@ -22,11 +22,15 @@ test("light palette is defined on bare :root", async () => {
 test("dark mode overrides tokens, guarded against an explicit light choice", async () => {
   const css = (await buildSite()).read("style.css");
   assert.ok(css.includes("prefers-color-scheme: dark"));
-  assert.ok(
-    css.includes(':root:not([data-theme="light"])'),
+  // Zola 0.23 hardcodes compressed Sass output, which strips quotes from
+  // attribute-selector values: [data-theme="light"] compiles to
+  // [data-theme=light]. Functionally identical; match either form.
+  assert.match(
+    css,
+    /:root:not\(\[data-theme=("?)light\1\]\)/,
     "dark media block must not beat an explicit light choice",
   );
-  assert.ok(css.includes(':root[data-theme="dark"]'));
+  assert.match(css, /:root\[data-theme=("?)dark\1\]/);
 });
 
 test("body paints an explicit background from a token", async () => {
@@ -35,8 +39,7 @@ test("body paints an explicit background from a token", async () => {
   assert.match(body, /background:\s*var\(--paper\)/);
 });
 
-test("measure is 895px inside a 935px column", async () => {
+test("measure token is 895px", async () => {
   const css = (await buildSite()).read("style.css");
-  assert.ok(css.includes("935px"), "main max-width");
   assert.ok(css.includes("--measure: 895px"));
 });

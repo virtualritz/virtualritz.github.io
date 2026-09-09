@@ -14,6 +14,6 @@ test:
 fonts:
     python3 build/fonts.py
 
-# Everything CI runs
+# Everything CI runs, plus `fonts` (which CI does not run)
 check: fonts build test
-    zola check
+    zola check --skip-external-links

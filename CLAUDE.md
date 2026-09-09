@@ -106,4 +106,4 @@ There is a single base layout (no per-page layout variants):
 
 ## Deployment
 
-The site deploys to GitHub Pages via `.github/workflows/deploy.yml` on every push to `master`: it runs `zola build`, then `zola check --skip-external-links`, then publishes the `public/` directory through the GitHub Pages Actions (not a `gh-pages` branch or manual Pages source setting).
+The site deploys to GitHub Pages via `.github/workflows/deploy.yml` on every push to `master`: it runs `npm test`, then `zola build`, then `zola check --skip-external-links`, then publishes the `public/` directory through the GitHub Pages Actions (not a `gh-pages` branch or manual Pages source setting).

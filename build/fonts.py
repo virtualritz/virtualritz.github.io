@@ -4,7 +4,7 @@
 Subsets are built with --layout-features='*' because Google Fonts' served
 webfonts strip most OpenType features; we need smcp, pcap, dlig and the
 italic swashes. Thunder is copied verbatim: its EULA forbids modifying
-the files, and the vendor already ships WOFF2.
+the files, and the vendor already ships TrueType (Thunder-VF.ttf).
 """
 import hashlib, json, os, shutil, subprocess, sys, zipfile, urllib.request
 from pathlib import Path
@@ -85,7 +85,7 @@ def audit(path: Path) -> dict:
 
 
 def thunder(faces: list) -> None:
-    """Copy the vendor's WOFF2 verbatim. Do not subset or convert."""
+    """Copy the vendor's TrueType file verbatim. Do not subset or convert."""
     if not THUNDER_ZIP.exists():
         print(f"  WARNING: {THUNDER_ZIP} not found; skipping Thunder")
         return

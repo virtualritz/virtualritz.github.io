@@ -23,7 +23,7 @@ test("sidenote columns only exist on very wide viewports", async () => {
   assert.match(css, /min-width:\s*1560px/);
 });
 
-test("no element forces horizontal page scroll", async () => {
+test("body does not set overflow-x: scroll", async () => {
   const css = (await buildSite()).read("style.css");
   assert.ok(!/body[^{]*\{[^}]*overflow-x:\s*scroll/.test(css));
 });

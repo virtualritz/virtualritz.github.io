@@ -43,3 +43,23 @@ test("measure token is 895px", async () => {
   const css = (await buildSite()).read("style.css");
   assert.ok(css.includes("--measure: 895px"));
 });
+
+test("--initial leads with Thunder VF", async () => {
+  // static/js/dropcaps.js gates its entire variable-weight path (solveWeight,
+  // stem rasterisation, the stroke-ratio match) on `initial === "Thunder VF"`,
+  // read from this token at runtime. If --initial is ever reordered so a
+  // different face leads, that whole path goes dead silently: the suite stays
+  // green and a plausible-looking (but unmatched-weight) cap still renders.
+  // This shipped once already and was only caught by hand.
+  const css = (await buildSite()).read("style.css");
+  // Zola 0.23 emits compressed Sass output: attribute-selector values lose
+  // their quotes and leading zeros are stripped, so match tolerantly rather
+  // than pinning the exact token text.
+  const m = css.match(/--initial:\s*"?([^",;]+)"?\s*,/);
+  assert.ok(m, "--initial token not found in compiled CSS");
+  assert.equal(
+    m[1].trim(),
+    "Thunder VF",
+    "--initial's leading face must be Thunder VF — see the gate in dropcaps.js",
+  );
+});

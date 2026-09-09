@@ -2,7 +2,6 @@
 title = "Example Essay: On the Nature of Digital Writing"
 date = 2024-01-15
 description = "An exploration of how digital mediums have transformed the way we write and think"
-template = "page-gwern.html"
 [taxonomies]
 tags = ["writing", "technology", "digital-culture"]
 +++

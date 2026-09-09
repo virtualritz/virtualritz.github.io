@@ -2,7 +2,6 @@
 title = "On Typography and the Web"
 date = 2024-01-27
 description = "Reflections on digital typography, readability, and the evolution of text presentation on the modern web"
-template = "page-gwern.html"
 
 [taxonomies]
 tags = ["typography", "design", "web", "reading"]

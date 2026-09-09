@@ -1,37 +1,43 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!doctype html>
+<html lang="{{ config.default_language }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}{{ config.title }}{% endblock title %}</title>
-    <meta name="description" content="{% block description %}{{ config.description }}{% endblock description %}">
-    
-    <link rel="stylesheet" href="{{ get_url(path="style.css", trailing_slash=false) }}">
-    
-    {% block extra_head %}{% endblock extra_head %}
-</head>
-<body>
-    <div id="page-wrapper">
-        <header id="site-header">
-            <nav id="main-nav">
-                <a href="/" class="home-link">{{ config.title | default(value="Home") }}</a>
-                <div class="nav-links">
-                    <a href="/essays/">Essays</a>
-                    <a href="/projects/">Projects</a>
-                    <a href="/about/">About</a>
-                </div>
-            </nav>
-        </header>
-        
-        <main id="content">
-            {% block content %}{% endblock content %}
-        </main>
-        
-        <footer id="site-footer">
-            <div class="footer-content">
-                <p>&copy; {{ now() | date(format="%Y") }} {{ config.extra.author | default(value="") }}</p>
-            </div>
-        </footer>
-    </div>
-</body>
+    <meta
+      name="description"
+      content="{% block description %}{{ config.description }}{% endblock description %}"
+    />
+    <link rel="stylesheet" href="{{ get_url(path='style.css') }}" />
+    <link
+      rel="alternate"
+      type="application/atom+xml"
+      href="{{ get_url(path='atom.xml') }}"
+    />
+    <script src="{{ get_url(path='js/theme.js') }}"></script>
+    {% block head %}{% endblock head %}
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <main id="content">
+      <nav id="site-nav">
+        <a href="{{ get_url(path='@/_index.md') }}">{{ config.title }}</a>
+        <a href="{{ get_url(path='@/essays/_index.md') }}">Essays</a>
+        <a href="{{ get_url(path='@/projects/_index.md') }}">Projects</a>
+        <a href="{{ get_url(path='@/about.md') }}">About</a>
+        <button
+          id="theme-toggle"
+          type="button"
+          aria-label="Switch colour scheme"
+        >
+          <span aria-hidden="true">◐</span>
+        </button>
+      </nav>
+      {% block content %}{% endblock content %}
+      <footer id="site-footer">
+        <p>© {{ now() | date(format="%Y") }} {{ config.extra.author }}</p>
+      </footer>
+    </main>
+    {% block scripts %}{% endblock scripts %}
+  </body>
 </html>

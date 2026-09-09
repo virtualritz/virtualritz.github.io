@@ -2,7 +2,6 @@
 title = "Design of This Website"
 date = 2024-01-25
 description = "Meta page describing this website's implementation using gwern.net-inspired typography and design principles"
-template = "page-gwern.html"
 
 [taxonomies]
 tags = ["design", "typography", "web", "minimalism"]

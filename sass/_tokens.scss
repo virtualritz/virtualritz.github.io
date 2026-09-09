@@ -1,0 +1,57 @@
+:root {
+  // palette — measured from gwern.net in light mode
+  --ink: #000;
+  --paper: #fff;
+  --link: #333;
+  --box: #f8f8f8;
+  --rule: #ccc;
+  --rule-strong: #888;
+  --muted: #555;
+  --on-accent: #fff;
+
+  // type
+  --serif:
+    "EB Garamond", "Apple Garamond", Baskerville, "Times New Roman", times,
+    serif;
+  --sans: "Source Sans 3", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Liberation Mono", consolas, monospace;
+  --display: "Thunder VF", "Arial Narrow", sans-serif;
+  --initial: "IM Fell English", var(--serif);
+
+  // metrics — 895px at EB Garamond 24px is ~99 characters, within 1.3%
+  // of gwern.net's ~100 at Source Serif 4 20px, so it carries over.
+  --measure: 895px;
+  --body-size: 24px;
+  --body-lh: 1.58;
+  --indent: 2.5em;
+
+  // punctuation spacing (see spec §8; CSS because Unicode spaces are
+  // not a portable width — thin space varies 2.1x across faces)
+  --emd-before: 0.1em;
+  --emd-after: 0.06em;
+  --sentence-gap: 0.09em;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #e8e6e1;
+    --paper: #131417;
+    --link: #b9b6ae;
+    --box: #1b1d21;
+    --rule: #33363c;
+    --rule-strong: #6d7178;
+    --muted: #999da4;
+    --on-accent: #131417;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ink: #e8e6e1;
+  --paper: #131417;
+  --link: #b9b6ae;
+  --box: #1b1d21;
+  --rule: #33363c;
+  --rule-strong: #6d7178;
+  --muted: #999da4;
+  --on-accent: #131417;
+}

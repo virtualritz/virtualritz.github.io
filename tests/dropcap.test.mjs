@@ -8,6 +8,10 @@ import {
   solveWeight,
   stripLetter,
 } from "../static/js/lib/dropcap-geometry.js";
+import {
+  MAX_DROPCAP_CANDIDATES,
+  selectDropcapCandidates,
+} from "../static/js/lib/dropcap-candidates.js";
 
 // EB Garamond at 24px/1.58, measured ratios
 const body = { fbAsc: 1.007, fbDesc: 0.298, capInk: 0.65 };
@@ -146,6 +150,56 @@ test("solveWeight hits the target stroke ratio", () => {
   assert.ok(Math.abs((stem(w) * 100) / 1.7 - 5.0) < 0.05);
 });
 
+// --- selectDropcapCandidates: which leading paragraph(s) are worth trying
+// as a drop-cap host. DOM-free by design: it only ever sees the tag names
+// of .article-body's direct children, in order. ---
+
+test("selectDropcapCandidates picks the first paragraph when it's the only one before a heading", () => {
+  const idx = selectDropcapCandidates(["P", "P", "H2"], 3);
+  assert.deepEqual(
+    idx,
+    [0, 1],
+    "both leading paragraphs are candidates; dropcaps.js tries index 0 first",
+  );
+});
+
+test("selectDropcapCandidates stops at the first heading, however deep it is", () => {
+  const idx = selectDropcapCandidates(["P", "P", "P", "H2", "P"], 5);
+  assert.deepEqual(
+    idx,
+    [0, 1, 2],
+    "the paragraph after the heading must not be offered as a candidate",
+  );
+});
+
+test("selectDropcapCandidates is bounded even with no heading in sight", () => {
+  const idx = selectDropcapCandidates(["P", "P", "P", "P", "P"], 3);
+  assert.deepEqual(
+    idx,
+    [0, 1, 2],
+    "a cap several paragraphs deep would look like a mistake, not intent",
+  );
+});
+
+test("selectDropcapCandidates skips non-paragraph, non-heading siblings without ending the search", () => {
+  // The TL;DR essay's actual shape: two standfirst paragraphs, then an <hr>,
+  // then the first real heading.
+  const idx = selectDropcapCandidates(["P", "P", "P", "HR", "H2"], 3);
+  assert.deepEqual(idx, [0, 1, 2]);
+});
+
+test("selectDropcapCandidates returns nothing when the article opens on a heading", () => {
+  assert.deepEqual(selectDropcapCandidates(["H2", "P"], 3), []);
+});
+
+test("MAX_DROPCAP_CANDIDATES is the default bound", () => {
+  const tags = new Array(10).fill("P");
+  assert.deepEqual(
+    selectDropcapCandidates(tags),
+    selectDropcapCandidates(tags, MAX_DROPCAP_CANDIDATES),
+  );
+});
+
 // --- dropcaps.js source: the DOM-insertion order that justif's leading-
 // float check depends on. No DOM is available under `node --test`, so
 // this pins the invariant at the source level instead (see sidenotes.test.mjs
@@ -218,6 +272,41 @@ test("the undo path does not throw, so capPlaced still resolves (never rejects)"
     s,
     /if\s*\(overhangs\)\s*\{[^}]*throw/s,
     "the undo branch must not throw",
+  );
+});
+
+test("the candidate loop stops at the first paragraph whose cap actually fits", () => {
+  const s = dropcapsSrc();
+  assert.match(
+    s,
+    /for \(const \{ p, letter \} of candidates\) \{/,
+    "must walk candidates in order",
+  );
+  assert.match(
+    s,
+    /if \(tryPlaceCap\(p, letter, opts, initial, weight\)\) return;/,
+    "must stop at the first candidate that fits rather than trying the rest",
+  );
+});
+
+test("the font-load await happens once for all candidates, not once per candidate", () => {
+  const s = dropcapsSrc();
+  // Regression: repeating the font-load-vs-timeout race per candidate
+  // would let a slow/blocked font multiply the ~2s budget by up to
+  // MAX_DROPCAP_CANDIDATES, since a stalled request neither resolves nor
+  // rejects on its own.
+  const loadCalls = s.match(/document\.fonts\.load\(/g) || [];
+  assert.equal(
+    loadCalls.length,
+    2,
+    "exactly one font.load call for --initial and one for --serif, total, " +
+      "not one pair per candidate",
+  );
+  const loadIdx = s.indexOf("document.fonts.load(");
+  const loopIdx = s.indexOf("for (const { p, letter } of candidates)");
+  assert.ok(
+    loadIdx >= 0 && loopIdx > loadIdx,
+    "font loading must happen before the candidate loop, not inside it",
   );
 });
 

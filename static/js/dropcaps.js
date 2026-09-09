@@ -18,7 +18,11 @@
  * unreliable before styles have applied.
  */
 import { waitForBox } from "./lib/wait-for-box.js";
-import { capGeometry, solveWeight } from "./lib/dropcap-geometry.js";
+import {
+  capGeometry,
+  paragraphFitsCapDepth,
+  solveWeight,
+} from "./lib/dropcap-geometry.js";
 
 const LINES = 3;
 const CAP_DROP_PCT = 3;
@@ -94,10 +98,27 @@ async function place(article) {
     .replace(/"/g, "")
     .trim();
 
+  // A cap reserves LINES lines of depth regardless of how tall the
+  // opening paragraph actually is. When the paragraph is shorter than
+  // that (e.g. a 2-line opener against LINES = 3), the cap overhangs
+  // below the paragraph's own bottom into whatever comes next — measured
+  // on /about/, into the following heading. Skip the cap rather than
+  // guess a shorter depth; a short opener isn't the essay-length prose
+  // this treatment was designed for.
+  if (
+    !paragraphFitsCapDepth(
+      p.getBoundingClientRect().height,
+      LINES,
+      lineHeight * bodySize,
+    )
+  ) {
+    return;
+  }
+
   // document.fonts.ready only settles for fonts the page has already
-  // requested. Neither face here qualifies: --display (also Thunder VF)
-  // is unused anywhere in sass/, --initial is consumed only by .dropcap
-  // (which this function creates), and there is no <link rel=preload>.
+  // requested. Neither face here qualifies: --initial is consumed only
+  // by .dropcap (which this function creates), and there is no
+  // <link rel=preload>.
   // So the first request for either face would otherwise be our own
   // measureText calls below, which return fallback-font metrics
   // synchronously on that first call — and a fallback glyph's ink is
@@ -105,10 +126,22 @@ async function place(article) {
   // Ask for both explicitly and wait. A rejected load (missing/blocked
   // font) degrades to the fallback already in the --serif/--initial
   // stack rather than throwing.
+  //
+  // Race against a timeout: FontFaceSet#load's promise can stay pending
+  // indefinitely (a stalled request neither resolves nor rejects), and
+  // the try/catch above only ever catches a *rejection*. A pending
+  // promise here would hang capPlaced, which typography.js awaits before
+  // calling justify() — silently disabling justification, protrusion,
+  // drop caps and sidenotes together. Falling through to the timeout
+  // measures whatever face is loaded so far, same as the catch below.
+  const FONT_LOAD_TIMEOUT_MS = 2000;
   try {
-    await Promise.all([
-      document.fonts.load(`${REF}px "${initial}"`, letter),
-      document.fonts.load(`${REF}px "${serif}"`, "Hl"),
+    await Promise.race([
+      Promise.all([
+        document.fonts.load(`${REF}px "${initial}"`, letter),
+        document.fonts.load(`${REF}px "${serif}"`, "Hl"),
+      ]),
+      new Promise((resolve) => setTimeout(resolve, FONT_LOAD_TIMEOUT_MS)),
     ]);
   } catch {
     // fall through — measurement reflects whichever face is available
@@ -167,9 +200,22 @@ async function place(article) {
   });
   if (!g) return;
 
-  // strip the letter from the flow and float a sized box in its place
-  const first = document.createTreeWalker(p, 4).nextNode();
-  first.data = first.data.replace(letter, "");
+  // strip the letter from the flow and float a sized box in its place.
+  // The letter isn't always in the paragraph's very first text node —
+  // <p> <em>A</em>lpha…</p> has a leading whitespace text node before the
+  // one holding "A" — so walk forward to the first text node that
+  // actually contains it rather than assuming nextNode()'s first result
+  // does. Blindly replacing on whatever comes first is a silent no-op
+  // when that node doesn't contain the letter, and the letter then
+  // duplicates: once in the dropcap box, once still in the flowed text.
+  const walker = document.createTreeWalker(p, 4);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.data.includes(letter)) {
+      node.data = node.data.replace(letter, "");
+      break;
+    }
+  }
 
   const box = document.createElement("span");
   box.className = "dropcap-box";

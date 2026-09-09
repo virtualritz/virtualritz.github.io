@@ -94,3 +94,47 @@ test("the .sr span is inserted after the box, not prepended to the paragraph", (
     "must insert .sr immediately after the box so the box stays p's first child",
   );
 });
+
+// --- sequencing: the cap must land in the DOM before justif ever scans the
+// paragraph. justif has no second pass, so a cap inserted afterwards
+// invalidates that paragraph's already-computed layout forever (measured:
+// only 9/15 paragraphs justified, always missing the capped one). No DOM is
+// available under `node --test`, so this pins the invariant at the source
+// level, the same way as the box-order test above. ---
+
+const typographySrc = () =>
+  readFileSync(new URL("../static/js/typography.js", import.meta.url), "utf8");
+
+test("typography.js awaits dropcaps.js's capPlaced before marking punctuation or justifying", () => {
+  const s = typographySrc();
+  assert.match(
+    s,
+    /import\s*\{\s*capPlaced\s*\}\s*from\s*"\.\/dropcaps\.js"/,
+    "typography.js must import capPlaced from dropcaps.js",
+  );
+  const capIdx = s.indexOf("await capPlaced");
+  const punctIdx = s.indexOf("markPunctuation(body)");
+  const justifyIdx = s.indexOf("justify(targets");
+  assert.ok(capIdx >= 0, "run() must await capPlaced");
+  assert.ok(punctIdx >= 0 && justifyIdx >= 0);
+  assert.ok(
+    capIdx < punctIdx && capIdx < justifyIdx,
+    "the drop cap must be placed (capPlaced awaited) before markPunctuation/" +
+      "justify run, not after",
+  );
+});
+
+test("dropcaps.js does not await typography's `ready` (that would reintroduce the justify-then-cap order)", () => {
+  const s = dropcapsSrc();
+  assert.doesNotMatch(
+    s,
+    /from\s*"\.\/typography\.js"/,
+    "dropcaps.js must not depend on typography.js: the cap is placed " +
+      "before justification runs, not after it",
+  );
+  assert.match(
+    s,
+    /export const capPlaced/,
+    "dropcaps.js must export capPlaced for typography.js to await",
+  );
+});

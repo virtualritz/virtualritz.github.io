@@ -6,10 +6,18 @@
  * font the browser actually loaded, and the manifest is keyed by slug
  * for the font tests' benefit, not for runtime layout.
  *
- * Must run after justif has settled (`ready`, Task 8): justif changes
- * paragraph heights, so measuring before it settles gives wrong geometry.
+ * Must run BEFORE justif (typography.js's `run()`, which awaits
+ * `capPlaced` below): justif has no second pass, so a cap inserted after
+ * justification invalidates that paragraph's already-computed layout
+ * forever (measured: the capped paragraph never got justified). The cap's
+ * own geometry does not depend on justif's output — capGeometry() reads
+ * only font-size, line-height and font metrics (all CSS-authored/font
+ * data), never anything justif changes (word-spacing, letter-spacing,
+ * line breaks) — so placing it first is safe. It still needs a real
+ * layout box first, same as justif: computed font-size/line-height are
+ * unreliable before styles have applied.
  */
-import { ready } from "./typography.js";
+import { waitForBox } from "./lib/wait-for-box.js";
 import { capGeometry, solveWeight } from "./lib/dropcap-geometry.js";
 
 const LINES = 3;
@@ -192,9 +200,13 @@ async function place(article) {
 }
 
 const article = document.querySelector("#article.essay");
-if (article) {
-  // after justif: it changes paragraph geometry. place() does its own
-  // explicit font loading (document.fonts.ready doesn't cover faces
-  // nothing else on the page has requested yet — see the comment above).
-  ready.then(() => requestAnimationFrame(() => place(article)));
-}
+
+// typography.js imports and awaits this before calling justify() — see the
+// ordering invariant in both files' header comments. Must always resolve
+// (never reject/hang): a stuck promise here would silently disable
+// justification, drop caps and sidenotes together. place() does its own
+// explicit font loading (document.fonts.ready doesn't cover faces nothing
+// else on the page has requested yet — see the comment above).
+export const capPlaced = article
+  ? waitForBox(".article-body > p").then((found) => found && place(article))
+  : Promise.resolve();

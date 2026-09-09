@@ -55,8 +55,17 @@ test("typography.js gates on a layout box and adds no ResizeObserver", () => {
   const src = readFileSync(root + "static/js/typography.js", "utf8");
   assert.match(
     src,
+    /waitForBox/,
+    "must wait for a real box before running: justif declines elements reported as 'not rendered'",
+  );
+  const waitForBoxSrc = readFileSync(
+    root + "static/js/lib/wait-for-box.js",
+    "utf8",
+  );
+  assert.match(
+    waitForBoxSrc,
     /getBoundingClientRect/,
-    "must wait for a real box: justif declines elements reported as 'not rendered'",
+    "the shared box-wait helper (used by both typography.js and dropcaps.js) must actually check for a real box",
   );
   assert.ok(
     !src.includes("new ResizeObserver"),

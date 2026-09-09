@@ -1,36 +1,9 @@
 #article {
   max-width: var(--measure);
-}
 
-.article-body {
-  text-align: justify;
-  hyphens: auto;
-  -webkit-hyphens: auto;
-  hyphenate-limit-chars: 6 3 3;
-  text-wrap: pretty;
-  hanging-punctuation: allow-end; // inert in Chrome today; free when it ships
-  font-variant-numeric: oldstyle-nums;
-
-  p {
-    margin: 0;
-    text-indent: var(--indent);
-  }
-
-  // first paragraph, and any paragraph opening a section, sits flush
-  > p:first-of-type,
-  h1 + p,
-  h2 + p,
-  h3 + p,
-  h4 + p,
-  blockquote + p,
-  figure + p,
-  pre + p,
-  ul + p,
-  ol + p,
-  table + p {
-    text-indent: 0;
-  }
-
+  // an h1 is an h1 wherever it sits: the frontmatter title lives in
+  // <header>, a sibling of .article-body, so headings are scoped to the
+  // whole article rather than to .article-body alone.
   h1,
   h2,
   h3,
@@ -70,6 +43,36 @@
     font-size: 24px;
     line-height: 1;
     font-weight: 700;
+  }
+}
+
+.article-body {
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
+  text-wrap: pretty;
+  hanging-punctuation: allow-end; // inert in Chrome today; free when it ships
+  font-variant-numeric: oldstyle-nums;
+
+  p {
+    margin: 0;
+    text-indent: var(--indent);
+  }
+
+  // first paragraph, and any paragraph opening a section, sits flush
+  > p:first-of-type,
+  h1 + p,
+  h2 + p,
+  h3 + p,
+  h4 + p,
+  blockquote + p,
+  figure + p,
+  pre + p,
+  ul + p,
+  ol + p,
+  table + p {
+    text-indent: 0;
   }
 
   blockquote {
@@ -118,8 +121,14 @@
     }
   }
 
+  // Zola emits bare <table> from markdown and the no-JS path forbids a JS
+  // wrapper, so the table is its own scroll container. width:max-content
+  // with max-width:100% lets narrow tables stay narrow and wide ones scroll.
   table {
-    width: 100%;
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
     border-collapse: collapse;
     font-size: 0.82em;
     font-variant-numeric: tabular-nums lining-nums;
@@ -141,11 +150,6 @@
     letter-spacing: 0.06em;
     color: var(--muted);
     border-bottom: 0.8px solid var(--rule-strong);
-  }
-
-  // wide content scrolls in its own box; the page never scrolls sideways
-  .scroll-x {
-    overflow-x: auto;
   }
 
   // punctuation spacing, emitted by punctuation.js (spec §8)

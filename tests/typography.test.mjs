@@ -21,17 +21,20 @@ test("paragraphs are indent-separated, first one flush", async () => {
 
 test("h1 is small-caps with a solid rule, h2 uppercase with a dotted rule", async () => {
   const c = await css();
+  // Headings are scoped to #article, not .article-body: the frontmatter
+  // <h1> lives in <header>, a sibling of .article-body, so a
+  // .article-body-scoped rule would never reach it.
   // Zola emits compressed CSS, so the brace sits immediately after the
   // selector. Pinning `{` to the selector matches only the standalone
   // rule, not the grouped `h1,h2,h3,h4` reset Sass emits before it.
   // Compression also strips leading zeros: 0.8px becomes .8px.
-  const h1 = c.match(/\.article-body h1\{([^}]*)\}/)[1];
+  const h1 = c.match(/#article h1\{([^}]*)\}/)[1];
   assert.match(
     h1,
     /font-variant:\s*small-caps|font-variant-caps:\s*small-caps/,
   );
   assert.match(h1, /border-bottom:\s*0?\.8px solid/);
-  const h2 = c.match(/\.article-body h2\{([^}]*)\}/)[1];
+  const h2 = c.match(/#article h2\{([^}]*)\}/)[1];
   assert.match(h2, /text-transform:\s*uppercase/);
   assert.match(h2, /border-bottom:\s*0?\.8px dotted/);
 });

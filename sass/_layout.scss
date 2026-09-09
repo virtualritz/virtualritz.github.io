@@ -10,12 +10,15 @@ main {
 #toc {
   float: left;
   max-width: 285px;
-  margin: 0 45px 20px 0;
+  // A full line of the body's own leading above the box, not the TOC's
+  // (smaller) one — anchored to --body-size so it doesn't shrink along
+  // with the em-relative font-size below.
+  margin: calc(var(--body-lh) * var(--body-size)) 45px 20px 0;
   padding: 12.5px 15px 15px;
   background: var(--box);
   border: 0.8px solid var(--rule);
   font-family: var(--sans);
-  font-size: 0.58em;
+  font-size: 0.75em;
   line-height: 1.25;
 
   h2 {

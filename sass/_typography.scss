@@ -8,7 +8,7 @@
   h2,
   h3,
   h4 {
-    font-family: var(--serif);
+    font-family: var(--initial);
     text-align: left;
     text-wrap: balance;
     hyphens: manual;
@@ -19,8 +19,12 @@
     font-size: 40px;
     line-height: 1;
     font-weight: 600;
-    font-variant: small-caps;
-    letter-spacing: -0.75px;
+    // font-variant: small-caps and the -0.75px tracking were tuned for
+    // EB Garamond's true small-cap glyphs. Thunder VF (var(--initial))
+    // has no smcp/c2sc — see static/fonts/manifest.json — so small-caps
+    // here would be the browser's synthesised fake: uniformly shrunk
+    // capitals, which reads poorly on a heavy display face. Dropped for
+    // both properties rather than carried over unexamined.
     border-bottom: 0.8px solid var(--rule-strong);
     padding-bottom: 1px;
   }

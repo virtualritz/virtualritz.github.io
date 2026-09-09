@@ -27,7 +27,7 @@ test("paragraphs are flush with a gap; .para-indent marks a hard-break continuat
   );
 });
 
-test("h1 is small-caps with a solid rule, h2 uppercase with a dotted rule", async () => {
+test("headings use the drop-cap face, not small-caps; h1 has a solid rule, h2 uppercase with a dotted rule", async () => {
   const c = await css();
   // Headings are scoped to #article, not .article-body: the frontmatter
   // <h1> lives in <header>, a sibling of .article-body, so a
@@ -36,8 +36,15 @@ test("h1 is small-caps with a solid rule, h2 uppercase with a dotted rule", asyn
   // selector. Pinning `{` to the selector matches only the standalone
   // rule, not the grouped `h1,h2,h3,h4` reset Sass emits before it.
   // Compression also strips leading zeros: 0.8px becomes .8px.
+  const grouped = c.match(
+    /#article h1,#article h2,#article h3,#article h4\{([^}]*)\}/,
+  )[1];
+  assert.match(grouped, /font-family:var\(--initial\)/);
   const h1 = c.match(/#article h1\{([^}]*)\}/)[1];
-  assert.match(
+  // Thunder VF (var(--initial)) has no smcp/c2sc glyphs, so small-caps
+  // here would be the browser's faux-synthesised version — dropped
+  // rather than carried over from the EB Garamond tuning.
+  assert.doesNotMatch(
     h1,
     /font-variant:\s*small-caps|font-variant-caps:\s*small-caps/,
   );

@@ -54,6 +54,29 @@ test("headings use the drop-cap face, not small-caps; h1 has a solid rule, h2 up
   assert.match(h2, /border-bottom:\s*0?\.8px dotted/);
 });
 
+test("headings are 30% larger than the pre-rescale sizes and lighter in weight", async () => {
+  const c = await css();
+  // 40/28/27/24px * 1.3, rounded to whole pixels; wght lightened within
+  // Thunder VF's 100-900 axis (static/fonts/manifest.json), h1 staying
+  // one step lighter than h2-h4 as before the change.
+  const h1 = c.match(/#article h1\{([^}]*)\}/)[1];
+  assert.match(h1, /font-size:\s*52px/);
+  assert.match(h1, /font-weight:\s*300/);
+  const h2 = c.match(/#article h2\{([^}]*)\}/)[1];
+  assert.match(h2, /font-size:\s*36px/);
+  assert.match(h2, /font-weight:\s*400/);
+  const h3 = c.match(/#article h3\{([^}]*)\}/)[1];
+  assert.match(h3, /font-size:\s*35px/);
+  assert.match(h3, /font-weight:\s*400/);
+  // Unlike h1-h3, "#article h4{" also occurs as the tail of the grouped
+  // shared-properties selector (h4 is last in that comma list), so a
+  // lookbehind is needed to skip straight past that false match to the
+  // standalone rule.
+  const h4 = c.match(/(?<!,)#article h4\{([^}]*)\}/)[1];
+  assert.match(h4, /font-size:\s*31px/);
+  assert.match(h4, /font-weight:\s*400/);
+});
+
 test("nested strong (`****foo****`) gets small caps with the bold reset", async () => {
   const c = await css();
   const rule = c.match(/\.article-body strong strong\{([^}]*)\}/)[1];

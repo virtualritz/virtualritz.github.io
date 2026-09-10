@@ -16,9 +16,14 @@
   }
 
   h1 {
-    font-size: 40px;
+    // 40px * 1.3, rounded (already whole)
+    font-size: 52px;
     line-height: 1;
-    font-weight: 600;
+    // Lighter, per the owner's request. Thunder VF's wght axis spans
+    // 100–900 (static/fonts/manifest.json), so 300 is a plain,
+    // in-range value — no font-variation-settings needed, the browser
+    // maps font-weight straight onto the registered wght axis.
+    font-weight: 300;
     // font-variant: small-caps and the -0.75px tracking were tuned for
     // EB Garamond's true small-cap glyphs. Thunder VF (var(--initial))
     // has no smcp/c2sc — see static/fonts/manifest.json — so small-caps
@@ -30,23 +35,28 @@
   }
 
   h2 {
-    font-size: 28px;
+    // 28px * 1.3 = 36.4px, rounded to a whole pixel
+    font-size: 36px;
     line-height: 1;
-    font-weight: 700;
+    // A step heavier than h1, as before, but still lighter than the
+    // old 700 — see h1 above for the wght axis range.
+    font-weight: 400;
     text-transform: uppercase;
     border-bottom: 0.8px dotted var(--rule-strong);
     padding-bottom: 1.4px;
   }
 
   h3 {
-    font-size: 27px;
+    // 27px * 1.3 = 35.1px, rounded to a whole pixel
+    font-size: 35px;
     line-height: 1;
-    font-weight: 700;
+    font-weight: 400;
   }
   h4 {
-    font-size: 24px;
+    // 24px * 1.3 = 31.2px, rounded to a whole pixel
+    font-size: 31px;
     line-height: 1;
-    font-weight: 700;
+    font-weight: 400;
   }
 }
 

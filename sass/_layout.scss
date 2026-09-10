@@ -97,3 +97,46 @@ main {
     padding: 16px 16px 20px;
   }
 }
+
+// Cloak the article until the typography pipeline has finished.
+//
+// Both classes are added by static/js/theme.js and by nothing else, which
+// is what makes this safe: with JS off, `js` is never added, the selector
+// never matches, and the page renders immediately. `data-cloak` is set by
+// templates/page.html — the only template that loads main.js — so listing
+// pages, which have no pipeline to wait for, are never hidden.
+//
+// visibility, not display or opacity: the layout is still performed, so
+// the page keeps its height and scrollbar and nothing reflows at the
+// moment of reveal. It also leaves the drop cap's and justifier's own
+// measurements working on a real laid-out box, which display:none would
+// not.
+//
+// theme.js guarantees the reveal on a timer even if the pipeline never
+// reports in, so a thrown exception in a module cannot strand a reader on
+// a blank article. See the comment there.
+html.js #article[data-cloak] {
+  visibility: hidden;
+}
+html.js.typo-ready #article[data-cloak] {
+  visibility: visible;
+}
+
+// Development-only switch drawn by theme.js for previewing the site with
+// the enhancement layer off. Never rendered for a visitor: theme.js only
+// creates it on a local server or with ?dev in the query string.
+#nojs-toggle {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 0.8px solid var(--rule-strong);
+  cursor: pointer;
+}

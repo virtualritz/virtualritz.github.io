@@ -99,6 +99,15 @@ let controller = null;
 let resolveReady;
 export const ready = new Promise((r) => (resolveReady = r));
 
+// theme.js cloaks the article until this fires (sass/_layout.scss), so the
+// pre-pipeline layout — TOC above the body, no drop cap, browser line
+// breaking — is never painted before being rearranged. An event rather
+// than an import because theme.js is a plain synchronous <head> script on
+// every page, while this module is only loaded on the ones with an
+// article; theme.js reveals on a timer regardless, so a failure here
+// delays the reveal but can never prevent it.
+ready.then(() => document.dispatchEvent(new Event("typo-ready")));
+
 // Pre-justify snapshot of each `.marginnote`'s markup, indexed by document
 // order. sidenotes.js hoists a margin note's sidenote clone from this
 // instead of the live span: unlike the footnotes case above, a margin

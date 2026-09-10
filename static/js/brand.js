@@ -34,7 +34,11 @@
  */
 import { waveWeight, WGHT } from "./lib/brand-wave.js";
 
-const brand = document.querySelector("#brand");
+// theme.js's development-only "JS: off" switch previews the CSS-only
+// rendering; the brand's static, unsplit state is part of that.
+const brand = document.documentElement.classList.contains("nojs-sim")
+  ? null
+  : document.querySelector("#brand");
 
 // prefers-reduced-motion gets the static mid-weight, not a slowed wave.
 // The specimen only softened the motion because motion was that page's

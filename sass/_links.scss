@@ -60,3 +60,17 @@
   background: none;
   text-shadow: none;
 }
+
+// The TOC needs its colour stated here, not inherited from context.
+// toc-move.js relocates <nav id="toc"> inside .article-body, where
+// `.article-body a` above would colour it — but only once that script has
+// run. Until then the TOC's links matched no colour rule at all and fell
+// back to the browser default #0000ee: on the dark ground, bright blue
+// links that turned grey the moment JS arrived (measured with script
+// execution disabled: 4 of 15 anchors on essays/typography, 27 of 439 on
+// the NSI essay, every one of them a TOC entry). var(--link) is the colour
+// they had after the move, so this changes nothing about the settled page
+// — it just stops the appearance from depending on JS.
+#toc a {
+  color: var(--link);
+}

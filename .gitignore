@@ -7,6 +7,9 @@
 # Local Claude Code state
 /.claude/settings.local.json
 /.claude/audit/
+# ...and anywhere else: the audit hook writes relative to the shell's cwd,
+# so a command run from a subdirectory drops one there instead.
+.claude/audit/
 # Claude Code worktrees and local state
 /.claude/worktrees/
 

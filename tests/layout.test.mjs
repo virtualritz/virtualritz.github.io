@@ -13,7 +13,10 @@ test("main is a 935px centred column", async () => {
 test("TOC floats inside the article, not in a sidebar", async () => {
   const css = (await buildSite()).read("style.css");
   const toc = css.match(/#toc\s*\{([^}]*)\}/)[1];
-  assert.match(toc, /max-width:\s*285px/);
+  // The golden section of the measure, less the gutter: the TOC and the
+  // text column beside it stand in 1:phi. Zola compresses the calc but
+  // keeps its shape.
+  assert.match(toc, /max-width:calc\(\(var\(--measure\) - 45px\)\/2\.618\)/);
   assert.match(toc, /background:\s*var\(--box\)/);
   // The float belongs to the moved TOC only. templates/page.html renders
   // #toc above .article-body and toc-move.js relocates it; floating it in

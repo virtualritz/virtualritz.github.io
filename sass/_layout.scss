@@ -5,6 +5,9 @@ main {
   position: relative;
 }
 
+// The gutter between the floated TOC and the text beside it.
+$toc-gutter: 45px;
+
 // gwern floats the TOC at the top-left of the article body. Putting it in
 // a page sidebar was the previous attempt's layout error.
 //
@@ -20,7 +23,11 @@ main {
 // article, which is the same shape the narrow-viewport rule below has
 // always used.
 #toc {
-  max-width: 285px;
+  // The golden section of the measure, less the gutter: the TOC and the
+  // text column beside it stand in 1:phi. It was 285px when the entries
+  // were set at 0.75em; at body size that box wrapped short entries onto
+  // a second line for no reason.
+  max-width: calc((var(--measure) - #{$toc-gutter}) / 2.618);
   margin: 0 0 1.6em;
   padding: 12.5px 15px 15px;
   background: var(--box);
@@ -49,18 +56,32 @@ main {
     margin: 0;
     padding: 0;
 
+    // Two columns — number, then entry — so a wrapped entry hangs under
+    // its own first line instead of running back under the number. A
+    // grid rather than the text-indent/padding-left pair because the
+    // marker's width varies with its depth ("4" against "4.4") and the
+    // grid measures it instead of being told a constant that is wrong for
+    // one level or the other.
     li {
       counter-increment: toc;
       margin-bottom: 0.3em;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 0.4em;
 
       &::before {
-        content: counters(toc, ".") "  ";
+        content: counters(toc, ".");
         color: var(--muted);
         font-variant-numeric: tabular-nums;
       }
     }
+    // A nested list is a third grid item; left alone it would be placed
+    // in the marker column of the next row. It spans both instead, so a
+    // sub-list starts under its parent's number, and its own indent comes
+    // from the padding below.
     ol {
       counter-reset: toc;
+      grid-column: 1 / -1;
       padding-left: 0.9em;
       margin-top: 0.3em;
     }
@@ -82,7 +103,7 @@ main {
   // A full line of the body's own leading above the box, not the TOC's
   // (smaller) one — anchored to --body-size so it doesn't shrink along
   // with the em-relative font-size.
-  margin: calc(var(--body-lh) * var(--body-size)) 45px 20px 0;
+  margin: calc(var(--body-lh) * var(--body-size)) $toc-gutter 20px 0;
 
   @media (max-width: 700px) {
     float: none;

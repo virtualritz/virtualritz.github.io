@@ -80,8 +80,20 @@ import { tocMoved } from "./toc-move.js";
 // (A `.marginnote` span can't be excluded the same way — it sits inside
 // an otherwise-normal paragraph that must still be justified — see the
 // snapshot taken in run(), below.)
+// `:not(#toc *)` excludes the table of contents. toc-move.js relocates
+// <nav id="toc"> to just after the first paragraph — inside .article-body
+// — so its <li>s match `.article-body li` and were being justified along
+// with the prose. They are navigation, not running text, and justif is
+// wrong for them twice over: a TOC entry is a single link that should
+// simply wrap, and each <li> carries its section number as a `::before`
+// counter (sass/_layout.scss), whose advance justif does not account for
+// — the same generated-content bug patched in the vendored copy. The
+// visible result was that any entry long enough to need three lines left
+// its number stranded alone on the first line, the link starting a line
+// below it (measured on the NSI essay: 7 of 27 entries, every one of them
+// a 3-line entry, none of the 1- and 2-line ones).
 const SELECTOR =
-  ".article-body p:not(.footnotes *), .article-body li:not(.footnotes *), .article-body blockquote p:not(.footnotes *)";
+  ".article-body p:not(.footnotes *), .article-body li:not(.footnotes *):not(#toc *), .article-body blockquote p:not(.footnotes *)";
 
 let controller = null;
 let resolveReady;

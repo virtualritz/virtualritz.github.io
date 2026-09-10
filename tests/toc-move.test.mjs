@@ -66,3 +66,28 @@ test("typography.js awaits toc-move.js's tocMoved before marking punctuation or 
       "justify run, not after",
   );
 });
+
+// --- the TOC must not be justified once it has been moved into the body ---
+
+test("typography.js's SELECTOR excludes #toc descendants", () => {
+  const src = typographySrc();
+  const m = src.match(/const SELECTOR =\s*([\s\S]*?);/);
+  assert.ok(m, "typography.js must define SELECTOR");
+  const selector = m[1];
+  // toc-move.js relocates <nav id="toc"> inside .article-body (that is the
+  // whole point of the move — see the header comment there), so every TOC
+  // <li> matches `.article-body li` and would otherwise be handed to
+  // justif. Two reasons it must not be: a TOC entry is a single link that
+  // should just wrap, and each <li> carries its section number as a
+  // `::before` counter (sass/_layout.scss) whose advance justif does not
+  // account for. Measured on the NSI essay before the exclusion: 7 of 27
+  // entries — precisely the ones long enough to need three lines — left
+  // their number stranded alone on the first line. After: 0 of 27.
+  assert.match(
+    selector,
+    /\.article-body li[^,]*:not\(#toc \*\)/,
+    "`.article-body li` must be qualified with :not(#toc *)",
+  );
+  // The footnote exclusion must survive alongside it.
+  assert.match(selector, /\.article-body li[^,]*:not\(\.footnotes \*\)/);
+});

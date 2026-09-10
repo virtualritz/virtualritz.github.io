@@ -98,8 +98,22 @@ details.collapse {
     padding: 0.9em 0;
     border-bottom: 0.8px solid var(--rule);
   }
+  // Post titles are links, but they read as titles: full ink, no rule. Only
+  // .article-body a carries the dotted-underline treatment, and the post list
+  // sits outside it — without a colour here the browser default (#0000ee)
+  // wins, which is unreadable on the dark ground.
   a {
     font-size: 1.1em;
+    color: var(--ink);
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--link);
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 0.16em;
+    }
   }
   .post-meta {
     display: block;

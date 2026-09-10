@@ -279,6 +279,11 @@
   position: absolute;
   left: -9999px;
 
+  // Without an explicit colour this is the browser default #0000ee, which is
+  // unreadable against --paper in dark mode — and this link only ever appears
+  // when a keyboard user focuses it, so a bad contrast here is worst-case.
+  color: var(--ink);
+
   &:focus {
     left: 1em;
     top: 1em;

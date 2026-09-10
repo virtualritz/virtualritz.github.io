@@ -74,14 +74,16 @@ test("brand.js is loaded from base.html, so the nav animates on every page", asy
 
 test("the brand is set in the display face, uppercased, with pinned letter boxes", async () => {
   const c = (await buildSite()).read("style.css");
-  const brand = c.match(/#site-nav #brand\{([^}]*)\}/)[1];
+  const brand = c.match(/#masthead #brand\{([^}]*)\}/)[1];
   assert.match(brand, /font-family:var\(--initial\)/);
-  // Uppercase is inherited from #site-nav rather than repeated here.
-  const nav = c.match(/#site-nav\{([^}]*)\}/)[1];
-  assert.match(nav, /text-transform:uppercase/);
+  assert.match(brand, /text-transform:uppercase/);
+  // Sized as a display headline, on the Typeface Bench specimen's own
+  // metrics (docs/specimen/typeface-bench.html, `.hl`): at the nav's text
+  // size the weight wave ran but was too small to read as motion.
+  assert.match(brand, /font-size:clamp\(52px,\s*11vw,\s*132px\)/);
   // A letter's advance grows with its weight; without a fixed, centred box
-  // the word would breathe and shove the rest of the nav sideways.
-  const cell = c.match(/#site-nav \.brand-cell\{([^}]*)\}/)[1];
+  // the word would breathe and shove the masthead about every frame.
+  const cell = c.match(/\.brand-cell\{([^}]*)\}/)[1];
   assert.match(cell, /display:inline-block/);
   assert.match(cell, /text-align:center/);
 });

@@ -34,8 +34,14 @@ import {
 } from "./lib/dropcap-geometry.js";
 
 const LINES = 3;
-const CAP_DROP_PCT = 3;
-const GROW_PCT = 4;
+// Both were optical nudges, and together they pushed the cap's baseline
+// 7% of the cap box below the third line's baseline — about 6.5px at the
+// 24px/1.58 body, plainly visible as a drop cap sitting lower than the
+// line it is supposed to sit on. A drop cap's whole construction is that
+// its baseline IS a body baseline, so there is nothing here to nudge:
+// both are zero, and `fit` below does the aligning.
+const CAP_DROP_PCT = 0;
+const GROW_PCT = 0;
 const STROKE_RATIO = 5.0; // spec §6: IM Fell English's J measures 5.23x
 const REF = 240; // measure large, then scale: a 24px stem is under 2px
 const OVERHANG_EPSILON_PX = 1; // absorb sub-pixel layout rounding
@@ -159,7 +165,14 @@ async function place(article) {
     bodySize,
     lineHeight,
     lines: LINES,
-    fit: "ink",
+    // "base" sizes the glyph on the ink ABOVE its baseline, so the cap's
+    // ink top lands on line 1's cap height and its baseline lands exactly
+    // on line 3's. "ink" sized the whole glyph, descender included, to
+    // that same span, which puts the baseline of any letter with a tail
+    // above the line — and, for a letter without one, made the two
+    // constants above the only thing displacing it. A descender should
+    // hang below the last line, as it does in metal.
+    fit: "base",
     capDropPct: CAP_DROP_PCT,
     growPct: GROW_PCT,
   };

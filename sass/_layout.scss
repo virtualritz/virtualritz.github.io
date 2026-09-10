@@ -7,18 +7,30 @@ main {
 
 // gwern floats the TOC at the top-left of the article body. Putting it in
 // a page sidebar was the previous attempt's layout error.
+//
+// The float is deliberately NOT set here: it is set below, only for a TOC
+// that has been moved inside .article-body. templates/page.html renders
+// <nav id="toc"> as a preceding sibling of .article-body, and toc-move.js
+// relocates it; until that runs — and for good with JS off — the TOC sits
+// above the body, where floating it made the opening paragraphs wrap
+// around a box that is not part of their column. The visible result was a
+// standfirst set in a narrow gutter beside the TOC whose last line then
+// escaped to the full measure underneath it, starting a whole TOC-width
+// to the left of the lines above. Unfloated it is simply a block above the
+// article, which is the same shape the narrow-viewport rule below has
+// always used.
 #toc {
-  float: left;
   max-width: 285px;
-  // A full line of the body's own leading above the box, not the TOC's
-  // (smaller) one — anchored to --body-size so it doesn't shrink along
-  // with the em-relative font-size below.
-  margin: calc(var(--body-lh) * var(--body-size)) 45px 20px 0;
+  margin: 0 0 1.6em;
   padding: 12.5px 15px 15px;
   background: var(--box);
   border: 0.8px solid var(--rule);
   font-family: var(--sans);
-  font-size: 0.75em;
+  // Body size. Anchored to --body-size rather than left as `1em`, because
+  // the TOC is a child of .article-body once toc-move.js has run and a
+  // sibling of it before that — a bare em would mean two different sizes
+  // depending on whether JS had arrived.
+  font-size: var(--body-size);
   line-height: 1.25;
 
   h2 {
@@ -53,6 +65,24 @@ main {
       margin-top: 0.3em;
     }
   }
+}
+
+// Floated only once toc-move.js has placed it after the first paragraph,
+// inside .article-body — the position the float was designed for, and the
+// only one where later paragraphs wrapping around it is correct.
+.article-body #toc {
+  float: left;
+  // Never sit beside the drop cap. The cap is itself a left float in the
+  // preceding paragraph, and when it hangs below that paragraph's last
+  // line the TOC lands in the gap next to it instead of at the column
+  // edge — which is why the indent appeared at some zoom levels and not
+  // others: it depends on whether the standfirst reflows to more lines
+  // than the cap is deep.
+  clear: left;
+  // A full line of the body's own leading above the box, not the TOC's
+  // (smaller) one — anchored to --body-size so it doesn't shrink along
+  // with the em-relative font-size.
+  margin: calc(var(--body-lh) * var(--body-size)) 45px 20px 0;
 
   @media (max-width: 700px) {
     float: none;
@@ -127,7 +157,11 @@ html.js.typo-ready #article[data-cloak] {
 // creates it on a local server or with ?dev in the query string.
 #nojs-toggle {
   position: fixed;
-  top: 8px;
+  // Bottom rather than top: the masthead now occupies the top-left corner
+  // at up to 132px, and a fixed button there covered the brand's first
+  // letter — most visibly at the narrow end, where the masthead is widest
+  // relative to the viewport.
+  bottom: 8px;
   left: 8px;
   z-index: 100;
   font-family: var(--sans);

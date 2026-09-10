@@ -4,6 +4,14 @@
   // an h1 is an h1 wherever it sits: the frontmatter title lives in
   // <header>, a sibling of .article-body, so headings are scoped to the
   // whole article rather than to .article-body alone.
+  // An <hr> clears the float for the same reason the headings below do: it
+  // is a full-width block, so its rule is drawn straight through the
+  // floated #toc's box and comes out as a stub beside the TOC rather than
+  // a line across the column.
+  hr {
+    clear: left;
+  }
+
   h1,
   h2,
   h3,
@@ -237,7 +245,7 @@
   font-size: 0.62em;
   letter-spacing: 0.02em;
   color: var(--muted);
-  text-align: center;
+  text-align: right;
   margin: 0.8em 0 1.6em;
   font-variant-numeric: oldstyle-nums;
 
@@ -261,6 +269,49 @@
   }
 }
 
+// The brand, set as a display headline rather than a nav item. Metrics are
+// the Typeface Bench specimen's own (docs/specimen/typeface-bench.html,
+// `.hl`) — the same clamp, leading, tracking and word-spacing — because
+// that is the rendering the site's faces were chosen on and the size the
+// weight wave is legible at. At the nav's text size the animation was
+// there but too small to read as motion.
+//
+// It sits above #site-nav rather than inside it: at this size it is a
+// masthead, and as a flex item on the nav row it would have dictated that
+// row's height and pushed the links off to one side.
+#masthead {
+  margin: 0.7em 0 0;
+
+  #brand {
+    display: block;
+    font-family: var(--initial);
+    font-size: clamp(52px, 11vw, 132px);
+    line-height: 0.92;
+    letter-spacing: -0.005em;
+    word-spacing: 0.06em;
+    text-transform: uppercase;
+    // The mid-point of Thunder's 100-900 axis: the weight every letter is
+    // measured at and pinned to, and the one a no-JS visitor sees.
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+  }
+}
+
+// One letter of the brand. brand.js pins an explicit px width here once
+// the face has loaded — a glyph's advance grows with its weight, and
+// without a fixed box the word would breathe, which at this size would
+// visibly shove the whole masthead about every frame. Centring is what
+// makes a letter thicken symmetrically inside that fixed box instead of
+// growing rightwards. Ligatures are off because a per-letter split already
+// prevents them: saying so keeps the no-JS rendering identical to the
+// measured one.
+.brand-cell {
+  display: inline-block;
+  text-align: center;
+  font-variant-ligatures: none;
+}
+
 #site-nav {
   display: flex;
   gap: 1.1em;
@@ -275,32 +326,6 @@
   a {
     color: var(--ink);
     text-decoration: none;
-  }
-
-  // The brand is set in the display face and its letters ride a weight
-  // wave driven by static/js/brand.js. Thunder is a tall, narrow display
-  // face: at the nav's own size its caps would sit visibly smaller than
-  // the sans links beside it, so it is scaled up until the cap heights
-  // agree. It keeps the nav's inherited uppercase.
-  #brand {
-    font-family: var(--initial);
-    font-size: 1.9em;
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    line-height: 1;
-  }
-
-  // One letter of the brand. brand.js pins an explicit px width here once
-  // the face has loaded — a glyph's advance grows with its weight, and
-  // without a fixed box the word would breathe and shove the rest of the
-  // nav sideways every frame. Centring is what makes a letter thicken
-  // symmetrically inside that fixed box instead of growing rightwards.
-  // Ligatures are off because a per-letter split already prevents them:
-  // saying so keeps the no-JS rendering identical to the measured one.
-  .brand-cell {
-    display: inline-block;
-    text-align: center;
-    font-variant-ligatures: none;
   }
 
   #theme-toggle {

@@ -16,6 +16,13 @@
  * line breaks) — so placing it first is safe. It still needs a real
  * layout box first, same as justif: computed font-size/line-height are
  * unreliable before styles have applied.
+ *
+ * The cap is placed once here, but its geometry is only valid for the
+ * font-size/line-height it was measured against: a later viewport change
+ * (e.g. a mobile rotation crossing sass/_layout.scss's
+ * `@media (max-width: 640px)` breakpoint) can silently invalidate it — see
+ * `recomputeDropCap` below and resize-recompute.js, which redoes this same
+ * placement, in the same before-justif order, on a material resize.
  */
 import { waitForBox } from "./lib/wait-for-box.js";
 import {
@@ -37,6 +44,12 @@ const cx = document.createElement("canvas").getContext("2d");
 const stemCx = document
   .createElement("canvas")
   .getContext("2d", { willReadFrequently: true });
+
+// State of the currently-placed cap, kept so a later viewport change can
+// undo it exactly (see recomputeDropCap below) — null when no cap is
+// placed (a short/non-letter opener, an overhang that left nothing
+// placed, or no essay on this page).
+let current = null;
 
 function inkRatios(family, ch, weight) {
   cx.font = `${weight ? weight + " " : ""}${REF}px "${family}"`;
@@ -255,6 +268,9 @@ async function place(article) {
     box.remove();
     sr.remove();
     node.data = restoreLetter(node.data, letter, stripped.index);
+    current = null;
+  } else {
+    current = { article, box, sr, node, letter, index: stripped.index };
   }
 }
 
@@ -269,3 +285,32 @@ const article = document.querySelector("#article.essay");
 export const capPlaced = article
   ? waitForBox(".article-body > p").then((found) => found && place(article))
   : Promise.resolve();
+
+/**
+ * Re-run cap placement against the current viewport: undoes the existing
+ * cap (if any) via the same strip/restore state `place()` already tracks,
+ * then calls `place()` again so size, weight and the overhang check are
+ * all freshly derived from the current font-size/line-height, rather than
+ * patched in place on the old box. Reuses place()'s own tested undo path
+ * instead of duplicating it.
+ *
+ * No-op when no cap is currently placed (a non-letter opener, an essay
+ * whose opening cap already lost the overhang check, or a non-essay
+ * page).
+ *
+ * Called by resize-recompute.js, and only AFTER typography.js's
+ * `resetJustif()` has torn down the previous justif layout: justif's
+ * "enhanced" paragraph markup is not the plain text `place()` expects to
+ * walk, and justif has no second pass — see the ordering invariant in
+ * typography.js's header comment, which this reuses for the resize path
+ * too.
+ */
+export async function recomputeDropCap() {
+  if (!current) return;
+  const { article: a, box, sr, node, letter, index } = current;
+  box.remove();
+  sr.remove();
+  node.data = restoreLetter(node.data, letter, index);
+  current = null;
+  await place(a);
+}

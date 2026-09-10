@@ -48,6 +48,15 @@
  * Import position, not just await position, is what gives them that
  * ordering: ES modules evaluate each import's top-level body, in source
  * order, before the importing module's own body runs.
+ *
+ * The same ordering invariant applies after first load: resize-recompute.js
+ * redoes capPlaced -> justify (tocMoved never needs redoing — the TOC's
+ * position relative to the first paragraph doesn't depend on viewport
+ * size) on a material viewport change, via `resetJustif()` and
+ * `justifyAgain()` below. `resetJustif()` must run, and finish, before
+ * dropcaps.js's `recomputeDropCap()` touches the paragraph, for the same
+ * "justif has no second pass" reason: its "enhanced" markup is not the
+ * plain text `place()` expects to walk.
  */
 import { justify, hangingCharacters } from "./lib/justif/index.js";
 import { hyphenateEnUS } from "./lib/justif/hyphenate/en-us.js";
@@ -182,6 +191,80 @@ async function run() {
 
 export function relayout() {
   if (controller) controller.refresh();
+}
+
+/**
+ * Tears down the current justif layout, restoring every managed
+ * paragraph's original DOM (text, and the drop-cap box if it has one) —
+ * unlike `relayout()` above, which calls `controller.refresh()` and is
+ * NOT a substitute for this (measured: refresh() after a DOM change
+ * dropped justified paragraphs from 9 to 7, with the capped paragraph
+ * still unjustified).
+ *
+ * Called by resize-recompute.js before dropcaps.js's `recomputeDropCap()`:
+ * justif's "enhanced" markup for a paragraph is not the plain text
+ * dropcaps.js's `place()` expects to walk, so the cap can only be safely
+ * redone once justif has let go of it. `justifyAgain()` below re-applies
+ * justif afterwards, replaying the same capPlaced -> tocMoved -> justify
+ * ordering invariant documented above for a viewport change instead of
+ * first load.
+ */
+export function resetJustif() {
+  if (!controller) return;
+  try {
+    controller.destroy();
+  } catch (err) {
+    console.warn("typography.js: controller.destroy() failed", err);
+  }
+  controller = null;
+}
+
+/**
+ * Re-applies justif from scratch to the current .article-body paragraphs.
+ * Only meaningful after `resetJustif()` (or on first load, via `run()`):
+ * justif has no second pass, so calling this while a controller is still
+ * managing the paragraphs recomputes nothing for them.
+ *
+ * Options are kept by hand in sync with run()'s own justify() call above
+ * (protrusion live-measured, "…" added to hangingCharacters.end) rather
+ * than factored into a shared helper, so as not to disturb the tests that
+ * anchor on run()'s literal `justify(targets, { ... })` call site.
+ */
+export async function justifyAgain() {
+  const targets = document.querySelectorAll(SELECTOR);
+  if (!targets.length) return;
+
+  const skipped = [];
+  try {
+    controller = justify(targets, {
+      hyphenate: hyphenateEnUS,
+      protrusion: true,
+      hangingPunctuation: {
+        edges: "line-end-only",
+        characters: { end: hangingCharacters.end + "…" },
+      },
+      onSkip: (p, reason) => skipped.push([describe(p), reason]),
+    });
+    await Promise.resolve(controller.ready).catch((err) => {
+      console.warn(
+        "typography.js: justif failed on rejustify, falling back to native justification",
+        err,
+      );
+    });
+  } catch (err) {
+    console.warn("typography.js: justifyAgain threw", err);
+    return;
+  }
+
+  if (skipped.length) {
+    document.documentElement.dataset.justifSkipped = String(skipped.length);
+    console.warn(
+      `typography.js: justif declined ${skipped.length} paragraph(s) on rejustify`,
+      skipped,
+    );
+  } else {
+    delete document.documentElement.dataset.justifSkipped;
+  }
 }
 
 // Checked once, synchronously, in frame one: an image/embed-only page has

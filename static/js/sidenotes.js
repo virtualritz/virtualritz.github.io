@@ -29,6 +29,18 @@
  * way .sr hides the drop cap's duplicated letter (visually hidden, still
  * present and focusable), keyed off the `has-sidenotes` class this file
  * sets only once notes have actually been hoisted.
+ *
+ * `build` is exported so resize-recompute.js can call it once more, right
+ * after it redoes the drop cap and rejustifies on a material viewport
+ * change: that recompute can itself change paragraph heights (a rewrapped
+ * first paragraph shifts every footnote reference below it), which would
+ * leave the fixed 200ms-debounced listener below racing a slower
+ * recompute and positioning against geometry that's about to move again.
+ * Calling `build` twice in that case is harmless — it fully recomputes
+ * positions from scratch each time — so this is a plain addition, not a
+ * replacement for the listener (sidenotes still need to reposition on a
+ * resize that changes nothing else about the essay's typography, e.g. one
+ * that only changes viewport height).
  */
 import { ready } from "./typography.js";
 import {
@@ -41,7 +53,7 @@ import {
 // Matches the @media (min-width: 1560px) breakpoint in sass/_layout.scss.
 const MIN_WIDTH = 1560;
 
-function build() {
+export function build() {
   const left = document.getElementById("sidenote-column-left");
   const right = document.getElementById("sidenote-column-right");
   const article = document.getElementById("article");

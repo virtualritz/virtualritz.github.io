@@ -9,3 +9,4 @@ import "./typography.js"; // awaits capPlaced + tocMoved, then justifies; export
 import "./dropcaps.js"; // places the cap; exports `capPlaced` (imported above)
 import "./toc-move.js"; // moves the TOC; exports `tocMoved` (imported above)
 import "./sidenotes.js"; // awaits ready, then positions against final geometry
+import "./resize-recompute.js"; // awaits ready, then redoes the cap + justify on a material resize

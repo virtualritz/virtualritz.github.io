@@ -255,6 +255,33 @@
     color: var(--ink);
     text-decoration: none;
   }
+
+  // The brand is set in the display face and its letters ride a weight
+  // wave driven by static/js/brand.js. Thunder is a tall, narrow display
+  // face: at the nav's own size its caps would sit visibly smaller than
+  // the sans links beside it, so it is scaled up until the cap heights
+  // agree. It keeps the nav's inherited uppercase.
+  #brand {
+    font-family: var(--initial);
+    font-size: 1.9em;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    line-height: 1;
+  }
+
+  // One letter of the brand. brand.js pins an explicit px width here once
+  // the face has loaded — a glyph's advance grows with its weight, and
+  // without a fixed box the word would breathe and shove the rest of the
+  // nav sideways every frame. Centring is what makes a letter thicken
+  // symmetrically inside that fixed box instead of growing rightwards.
+  // Ligatures are off because a per-letter split already prevents them:
+  // saying so keeps the no-JS rendering identical to the measured one.
+  .brand-cell {
+    display: inline-block;
+    text-align: center;
+    font-variant-ligatures: none;
+  }
+
   #theme-toggle {
     margin-left: auto;
     background: none;

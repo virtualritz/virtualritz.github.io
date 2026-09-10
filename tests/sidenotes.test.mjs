@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import {
   resolveColumn,
+  assignColumns,
   pairReferences,
   footnoteLabel,
   isBackrefFor,
@@ -44,6 +45,63 @@ test("pushes cascade", () => {
 
 test("empty input is safe", () => {
   assert.deepEqual(resolveColumn([]), []);
+});
+
+// --- assignColumns ----------------------------------------------------
+//
+// Bug 2: a margin note has no reference to pair against, so it can't join
+// the footnote-only per-list indexing sidenotes.js used to alternate
+// columns with. assignColumns is the DOM-free replacement: it merges any
+// kind of margin item (footnote sidenote, margin note, ...) into one
+// left/right split ordered by real page position, so a footnote sidenote
+// and a margin note authored right next to each other (as in
+// content/essays/typography.md) can't land in the same column and
+// collide — see resolveColumn above, which only resolves overlaps within
+// a single column's own list.
+
+test("assignColumns alternates left/right in top-to-bottom order, independent of input order", () => {
+  const cols = assignColumns([
+    { top: 50, id: "b" },
+    { top: 0, id: "a" },
+    { top: 150, id: "d" },
+    { top: 100, id: "c" },
+  ]);
+  assert.deepEqual(
+    cols[0].map((i) => i.id),
+    ["a", "c"],
+  );
+  assert.deepEqual(
+    cols[1].map((i) => i.id),
+    ["b", "d"],
+  );
+});
+
+test("assignColumns keeps input order for equal top values (stable sort)", () => {
+  const cols = assignColumns([
+    { top: 10, id: "first" },
+    { top: 10, id: "second" },
+  ]);
+  assert.deepEqual(
+    cols[0].map((i) => i.id),
+    ["first"],
+  );
+  assert.deepEqual(
+    cols[1].map((i) => i.id),
+    ["second"],
+  );
+});
+
+test("assignColumns does not mutate its input array", () => {
+  const items = [{ top: 5 }, { top: 1 }];
+  assignColumns(items);
+  assert.deepEqual(
+    items.map((i) => i.top),
+    [5, 1],
+  );
+});
+
+test("assignColumns is safe on empty input", () => {
+  assert.deepEqual(assignColumns([]), [[], []]);
 });
 
 // --- pairReferences / footnoteLabel / isBackrefFor -------------------------
@@ -256,7 +314,13 @@ const src = () => readSrc("../static/js/sidenotes.js");
 const layoutSrc = () => readSrc("../static/js/lib/sidenote-layout.js");
 
 test("sidenotes.js awaits `ready` before measuring anything", () => {
-  assert.match(src(), /import\s*\{\s*ready\s*\}\s*from\s*"\.\/typography\.js"/);
+  // sidenotes.js also imports marginNoteHTML from the same module (Bug 2
+  // fix), so this only pins that `ready` is among the named imports,
+  // rather than the only one.
+  assert.match(
+    src(),
+    /import\s*\{[^}]*\bready\b[^}]*\}\s*from\s*"\.\/typography\.js"/,
+  );
   assert.match(src(), /ready\.then\(/);
 });
 
@@ -311,4 +375,137 @@ test("the native footnote section is never hidden via the hidden attribute", () 
   assert.doesNotMatch(src(), /setAttribute\("hidden"/);
   assert.doesNotMatch(src(), /removeAttribute\("hidden"\)/);
   assert.match(src(), /classList\.(add|remove)\("has-sidenotes"\)/);
+});
+
+// --- Bug 1: sidenote overflow from justif's frozen segments ----------------
+
+const typographySrc = () => readSrc("../static/js/typography.js");
+
+test("justif's target selector excludes Zola's collected footnote list", () => {
+  // The footnote <li>/<p> would otherwise be justified at the ~895px
+  // .article-body measure before sidenotes.js ever clones it into a
+  // 260px column; justif's output doesn't reflow at a narrower width
+  // (fixed-width, non-wrapping segments), so it overflowed the column and
+  // spilled onto the body text. Excluding the source is the fix (rather
+  // than stripping justif's markup back out of the clone afterwards):
+  // nothing is ever applied to it in the first place.
+  const m = typographySrc().match(/const SELECTOR =\s*([\s\S]*?);/);
+  assert.ok(m, "SELECTOR constant not found in typography.js");
+  assert.match(m[1], /:not\(\.footnotes \*\)/);
+});
+
+test("sidenotes.js never needs to strip justif markup from a footnote clone", () => {
+  // With the footnote source excluded from SELECTOR above, li.cloneNode's
+  // result is always plain, reflowable Zola markup — asserting the
+  // absence of any justif-stripping logic here pins that this is the only
+  // fix in place, not a second one layered on top of it.
+  assert.doesNotMatch(src(), /justif-seg/);
+  assert.doesNotMatch(src(), /data-justif/);
+});
+
+// --- Bug 2: marginnote hoisting ---------------------------------------
+
+test("typography.js snapshots each .marginnote's markup before justify() runs", () => {
+  const t = typographySrc();
+  const markPunctIdx = t.indexOf("markPunctuation(body)");
+  // The reassignment inside run(), not the `let marginNoteSnapshots = []`
+  // module-scope declaration further up the file.
+  const snapshotIdx = t.indexOf("marginNoteSnapshots = [...body");
+  const justifyIdx = t.indexOf("controller = justify(targets");
+  assert.ok(markPunctIdx !== -1 && snapshotIdx !== -1 && justifyIdx !== -1);
+  assert.ok(
+    markPunctIdx < snapshotIdx && snapshotIdx < justifyIdx,
+    "the snapshot must be taken after markPunctuation and before justify()",
+  );
+  assert.match(t, /export function marginNoteHTML\(/);
+});
+
+test("sidenotes.js sources a margin note's clone from the pre-justify snapshot, not the live (possibly justified) span", () => {
+  const s = src();
+  assert.match(s, /import\s*\{[^}]*\bmarginNoteHTML\b[^}]*\}/);
+  assert.match(s, /marginNoteHTML\(/);
+});
+
+test("a hoisted margin note carries no reference mark or number", () => {
+  // "sidenote-number" must appear exactly once in the whole file: the
+  // footnote path's own `n.className = "sidenote-number"`. A margin note
+  // has nothing to number — it is authored, not derived from a citation.
+  const matches = src().match(/sidenote-number/g) || [];
+  assert.equal(matches.length, 1);
+});
+
+test("margin notes and footnote sidenotes share one column assignment", () => {
+  // Both content/essays/typography.md's footnote and its marginnote sit in
+  // the same short section; if the two kinds were assigned to columns
+  // independently, a footnote sidenote and a margin note could land in
+  // the same column with no shared collision check between them.
+  assert.match(src(), /assignColumns\(/);
+});
+
+test("sidenotes.js clears has-sidenotes unconditionally, before branching on viewport width", () => {
+  // A rebuild (resize, or resize-recompute.js's extra call) can run while a
+  // margin note is still clipped from the previous pass; measuring its
+  // clipped near-zero-size box instead of its true in-flow position would
+  // place the new clone at the wrong height. The clear must happen before
+  // the `if (!wide)` branch is even reached — putting/leaving it *inside*
+  // that branch (so it only fires on the narrow path) would textually
+  // still land "before" every getBoundingClientRect() call below, so this
+  // checks position relative to the wide/narrow branch point itself, not
+  // relative to the first measurement.
+  const s = src();
+  const removeIdx = s.indexOf('classList.remove("has-sidenotes")');
+  const wideIdx = s.indexOf("const wide = window.innerWidth");
+  assert.ok(removeIdx !== -1, "has-sidenotes must be cleared somewhere");
+  assert.ok(wideIdx !== -1, "the wide/narrow branch point must exist");
+  assert.ok(
+    removeIdx < wideIdx,
+    "has-sidenotes must be cleared before the wide/narrow branch, not only inside it",
+  );
+});
+
+test("no stray second has-sidenotes removal reintroduces the narrow-only bug", () => {
+  // Guards against a future edit moving the clear call back inside the
+  // `if (!wide)` branch only, which would reintroduce the stale-clip
+  // measurement bug on a wide-viewport rebuild.
+  assert.equal(
+    (src().match(/classList\.remove\("has-sidenotes"\)/g) || []).length,
+    1,
+  );
+});
+
+// --- Build-based: real Zola output for the demo page -----------------------
+
+test("the demo page's marginnote sits inline inside a paragraph in the static build (the no-JS/narrow-viewport fallback)", async () => {
+  const html = (await buildSite()).read("essays/typography/index.html");
+  const idx = html.indexOf('class="marginnote"');
+  assert.ok(idx !== -1, "demo page must contain a marginnote");
+  // No server-side hoisting exists — the sidenote column classes/ids only
+  // ever appear via client-side JS, never in Zola's own output.
+  assert.doesNotMatch(html, /class="sidenote"/);
+  assert.doesNotMatch(html, /id="sn-/);
+});
+
+test(".has-sidenotes clips a hoisted .marginnote the same way it clips .footnotes", async () => {
+  const css = (await buildSite()).read("style.css");
+  const rule = css.match(/\.has-sidenotes \.marginnote\{([^}]*)\}/)?.[1];
+  assert.ok(rule, ".has-sidenotes .marginnote rule not found");
+  assert.match(rule, /clip-path:\s*inset\(50%\)/);
+  assert.match(rule, /width:\s*1px/);
+  assert.doesNotMatch(css, /\.marginnote\[hidden\]/);
+  assert.doesNotMatch(rule, /display:\s*none/);
+});
+
+test(".marginnote's narrow/no-JS fallback is plain inline styling, not the old block layout", async () => {
+  const css = (await buildSite()).read("style.css");
+  // The base (unscoped) rule is the one that applies below the sidenote
+  // breakpoint / without JS; it must not carry the block-era declarations
+  // that used to split the authoring paragraph into three pieces, nor
+  // reintroduce display:block.
+  const rules = [...css.matchAll(/(?:^|\})(\.marginnote\{[^}]*\})/g)].map(
+    (m) => m[1],
+  );
+  const base = rules.find((r) => !r.startsWith(".has-sidenotes"));
+  assert.ok(base, "base .marginnote rule not found");
+  assert.doesNotMatch(base, /display:\s*block/);
+  assert.doesNotMatch(base, /border-left/);
 });

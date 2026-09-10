@@ -15,6 +15,21 @@ export function resolveColumn(notes, gap = 12) {
 }
 
 /**
+ * Splits margin items (each carrying a numeric `top`) into the two
+ * alternating sidenote columns, in top-to-bottom order — the shared
+ * placement rule sidenotes.js uses to interleave footnote sidenotes and
+ * margin notes into the same pair of columns, so which column an item
+ * lands in depends on its real position on the page, not on which of the
+ * two kinds it is. Ties keep their input order (Array#sort is stable).
+ */
+export function assignColumns(items) {
+  const sorted = [...items].sort((a, b) => a.top - b.top);
+  const cols = [[], []];
+  sorted.forEach((item, i) => cols[i % 2].push(item));
+  return cols;
+}
+
+/**
  * The target id a footnote reference's href points at — the part after
  * the last "#". Zola's hrefs are absolute permalinks (e.g.
  * "https://.../essay/#fn-1"), so this must never be compared with `===`

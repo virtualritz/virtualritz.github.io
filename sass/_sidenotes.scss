@@ -53,3 +53,21 @@
   overflow: hidden;
   white-space: nowrap;
 }
+
+// Same clip technique, for the same reason, once a .marginnote has been
+// duplicated into a sidenote column (static/js/sidenotes.js): the original
+// stays in the accessibility tree and in its natural reading position —
+// there is no reference mark to restore that position from, unlike a
+// footnote's [n] link, so leaving it in place (rather than moving it) is
+// what keeps it discoverable at all for assistive tech.
+.has-sidenotes .marginnote {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}

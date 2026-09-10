@@ -52,12 +52,20 @@ details.collapse {
   }
 }
 
+// The wide-viewport treatment lives in sass/_sidenotes.scss: a hoisted
+// margin note becomes a plain .sidenote in the margin column, and this
+// span is clipped out of sight (still present for assistive tech). This
+// rule is what's left: the narrow-viewport/no-JS fallback, sitting inline
+// in running prose. It was briefly `display: block`, which split the
+// paragraph it's authored inside into three stacked pieces; the leftover
+// border/padding/margin from that were block-only properties with no
+// correct rendering on an inline span, so they're gone rather than kept
+// around unused. Italic + muted is the same "this is an aside, not the
+// sentence" cue a hoisted sidenote gives visually, without breaking the
+// sentence's flow.
 .marginnote {
-  border-left: 2px solid var(--rule);
-  padding-left: 0.9em;
-  margin: 1em 0;
-  font-size: 0.72em;
-  line-height: 1.4;
+  font-style: italic;
+  font-size: 0.92em;
   color: var(--muted);
 }
 

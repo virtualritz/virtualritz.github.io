@@ -67,12 +67,48 @@ import { longTokensMarked } from "./mark-long-tokens.js";
 import { capPlaced } from "./dropcaps.js";
 import { tocMoved } from "./toc-move.js";
 
+// `:not(.footnotes *)` excludes Zola's collected footnote list: its
+// visible form below the sidenote breakpoint is native browser reflow
+// (never justified), and above it sidenotes.js hoists a clone into a
+// 260px column. justif's output is fixed-width, non-reflowing segments
+// (`white-space: nowrap` spans) computed for whatever width it measured
+// — the ~895px .article-body measure, not the sidenote column's — and
+// that frozen layout doesn't fit either destination, so the footnote
+// source is excluded here rather than measured and thrown away. This is
+// the whole fix for that overflow: nothing downstream needs to strip
+// justif artifacts from a footnote clone, because none are ever applied.
+// (A `.marginnote` span can't be excluded the same way — it sits inside
+// an otherwise-normal paragraph that must still be justified — see the
+// snapshot taken in run(), below.)
 const SELECTOR =
-  ".article-body p, .article-body li, .article-body blockquote p";
+  ".article-body p:not(.footnotes *), .article-body li:not(.footnotes *), .article-body blockquote p:not(.footnotes *)";
 
 let controller = null;
 let resolveReady;
 export const ready = new Promise((r) => (resolveReady = r));
+
+// Pre-justify snapshot of each `.marginnote`'s markup, indexed by document
+// order. sidenotes.js hoists a margin note's sidenote clone from this
+// instead of the live span: unlike the footnotes case above, a margin
+// note's paragraph is a normal justif target, so justif decomposes the
+// note's own text into the same per-word `justif-seg`/`justif-hyphen`/
+// `justif-joint` spans (with inline word-/letter-spacing) it applies to
+// any other inline run in a justified paragraph — frozen at the
+// ~895px measure, exactly like the footnote content above, and just as
+// unable to reflow inside a 260px column. Captured once, right after
+// markPunctuation and before justify() ever runs, so it's the last clean
+// state; the authored text never changes with viewport, so this one
+// snapshot stays valid across resize-recompute's rejustify too — nothing
+// re-snapshots on that path, same as markPunctuation itself isn't
+// re-run there.
+let marginNoteSnapshots = [];
+
+/** The pre-justify innerHTML of the nth `.marginnote` (document order), or
+ * `undefined` if none was captured (e.g. run() bailed before reaching it) —
+ * callers fall back to the live span's own innerHTML in that case. */
+export function marginNoteHTML(index) {
+  return marginNoteSnapshots[index];
+}
 
 // A short, inspectable label for a declined paragraph: "p#foo" or "li".
 function describe(el) {
@@ -97,6 +133,10 @@ async function run() {
     ]);
 
     markPunctuation(body);
+
+    marginNoteSnapshots = [...body.querySelectorAll(".marginnote")].map(
+      (el) => el.innerHTML,
+    );
 
     const targets = document.querySelectorAll(SELECTOR);
     if (!targets.length) return resolveReady();

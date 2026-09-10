@@ -41,10 +41,44 @@
  * replacement for the listener (sidenotes still need to reposition on a
  * resize that changes nothing else about the essay's typography, e.g. one
  * that only changes viewport height).
+ *
+ * Margin notes (`.marginnote`, templates/shortcodes/marginnote.html) are
+ * hoisted the same way and into the same two columns, but they carry no
+ * reference mark or number — the component's whole point is an authored
+ * aside, not a derived citation — so there is no reference-to-definition
+ * pairing to do: every `.marginnote` on the page is always hoisted (when
+ * wide), keyed to its own original position rather than some other
+ * element's. Because a footnote sidenote and a margin note can legitimately
+ * sit close together (see content/essays/typography.md), both kinds are
+ * merged into one list and sorted by real page position before the
+ * alternating left/right split (`assignColumns`, lib/sidenote-layout.js),
+ * so which column an item lands in — and whether it clears the item above
+ * it in that column — never depends on which kind it is. A margin note's
+ * clone is sourced from typography.js's `marginNoteHTML` pre-justify
+ * snapshot rather than the live span: like the footnote content this file
+ * used to justify-then-clone (see that file's header comment for why that
+ * broke sidenotes), a margin note's paragraph is a normal justif target,
+ * so the live span carries the same non-reflowing per-word artifacts.
+ *
+ * Below the breakpoint, or on narrower viewports generally, a margin note
+ * is left exactly where it was authored — inline, mid-sentence, in
+ * `sass/_components.scss`'s `.marginnote` styling — which is also the
+ * no-JS fallback.
+ *
+ * Rebuild safety: `has-sidenotes` is cleared before anything is measured
+ * (not just in the narrow branch), because a rebuild — a resize, or this
+ * file's own re-run from resize-recompute.js — can otherwise run while a
+ * margin note is still clipped from the *previous* pass (see the CSS in
+ * sass/_sidenotes.scss): measuring a clipped span's near-zero-size box
+ * instead of its natural in-flow position would place its new clone at
+ * the wrong height. Footnote references are unaffected by this (only the
+ * collected `.footnotes` section is ever clipped, never an in-text `<sup>`
+ * reference), but clearing unconditionally keeps one rule for both.
  */
-import { ready } from "./typography.js";
+import { ready, marginNoteHTML } from "./typography.js";
 import {
   resolveColumn,
+  assignColumns,
   pairReferences,
   footnoteLabel,
   isBackrefFor,
@@ -53,22 +87,9 @@ import {
 // Matches the @media (min-width: 1560px) breakpoint in sass/_layout.scss.
 const MIN_WIDTH = 1560;
 
-export function build() {
-  const left = document.getElementById("sidenote-column-left");
-  const right = document.getElementById("sidenote-column-right");
-  const article = document.getElementById("article");
-  if (!left || !right || !article) return;
-
+function footnoteEntries(article, anchorTop) {
   const list = article.querySelector(".footnotes ol, ol.footnotes");
-  if (!list) return;
-
-  const wide = window.innerWidth >= MIN_WIDTH;
-  if (!wide) {
-    document.documentElement.classList.remove("has-sidenotes");
-    left.replaceChildren();
-    right.replaceChildren();
-    return;
-  }
+  if (!list) return [];
 
   const refs = [...article.querySelectorAll("sup.footnote-reference a")];
   const items = [...list.querySelectorAll("li")];
@@ -77,8 +98,7 @@ export function build() {
     refs.map((a) => a.getAttribute("href") || ""),
   );
 
-  const cols = [[], []];
-
+  const entries = [];
   items.forEach((li, i) => {
     const ref = refs[pairing[i]];
     if (!ref) return;
@@ -97,22 +117,68 @@ export function build() {
       if (isBackrefFor(a.getAttribute("href") || "", label)) a.remove();
     }
 
-    cols[i % 2].push({ note, ref });
+    entries.push({ top: anchorTop(ref), note });
   });
+  return entries;
+}
+
+function marginNoteEntries(article, anchorTop) {
+  const spans = [...article.querySelectorAll(".marginnote")];
+  return spans.map((span, i) => {
+    const note = document.createElement("div");
+    note.className = "sidenote";
+    // No reference mark and no pairing: a margin note has no citation to
+    // match, only its own position. Prefer the pre-justify snapshot (see
+    // typography.js) and fall back to the live span if none was captured
+    // (e.g. justif never ran on this page at all, so there is nothing to
+    // strip in the first place).
+    const html = marginNoteHTML(i);
+    note.innerHTML = html !== undefined ? html : span.innerHTML;
+    return { top: anchorTop(span), note };
+  });
+}
+
+export function build() {
+  const left = document.getElementById("sidenote-column-left");
+  const right = document.getElementById("sidenote-column-right");
+  const article = document.getElementById("article");
+  if (!left || !right || !article) return;
+
+  // See the header comment: clear before measuring anything, not just in
+  // the narrow branch below.
+  document.documentElement.classList.remove("has-sidenotes");
+
+  const wide = window.innerWidth >= MIN_WIDTH;
+  if (!wide) {
+    left.replaceChildren();
+    right.replaceChildren();
+    return;
+  }
+
+  const articleTop = article.getBoundingClientRect().top + window.scrollY;
+  const anchorTop = (el) =>
+    el.getBoundingClientRect().top + window.scrollY - articleTop;
+
+  const entries = [
+    ...footnoteEntries(article, anchorTop),
+    ...marginNoteEntries(article, anchorTop),
+  ];
+
+  if (!entries.length) {
+    left.replaceChildren();
+    right.replaceChildren();
+    return;
+  }
+
+  const cols = assignColumns(entries);
 
   [left, right].forEach((col, ci) => {
     col.replaceChildren(...cols[ci].map((e) => e.note));
   });
 
-  if (!cols[0].length && !cols[1].length) {
-    document.documentElement.classList.remove("has-sidenotes");
-    return;
-  }
-
-  const articleTop = article.getBoundingClientRect().top + window.scrollY;
   [left, right].forEach((col, ci) => {
-    const measured = cols[ci].map(({ note, ref }) => ({
-      top: ref.getBoundingClientRect().top + window.scrollY - articleTop,
+    const measured = cols[ci].map(({ top, note }) => ({
+      top,
       height: note.getBoundingClientRect().height,
     }));
     const tops = resolveColumn(measured);

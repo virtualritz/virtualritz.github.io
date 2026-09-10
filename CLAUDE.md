@@ -33,6 +33,37 @@ submodule.
 - Static assets go in `static/` directory
 - Sass files in `sass/` are automatically compiled
 
+#### Hiding a post: `draft` vs `[extra] unlisted`
+
+Two different things, both look like "hiding a post" but are not interchangeable:
+
+- **`draft = true`** (front matter, top level) - the page is **not built at
+  all**. It gets no output file and its URL 404s. Use this while a post is
+  not ready for anyone to see it, including someone with a direct link.
+  `content/essays/nsi-vs-hydra-vs-riley.md` currently uses this.
+- **`[extra]` `unlisted = true`** (front matter) - the page **is built** and
+  reachable at its normal URL, but is left out of everywhere the site
+  advertises its contents: the homepage's recent-essays list
+  (`templates/index.html`), the section listing (`templates/section.html`),
+  the tag listing and tag index (`templates/taxonomy_single.html`,
+  `templates/taxonomy_list.html` - a tag whose only member is unlisted is
+  dropped from the tag index entirely rather than showing a `0` or a
+  misleadingly-higher count), `sitemap.xml`, and the tag's Atom feed
+  (`templates/atom.xml`). It also gets `<meta name="robots" content="noindex,
+nofollow">` (added in `templates/base.html`) so search engines are asked
+  not to index it. Use this for a post someone with the URL should be able
+  to read, that should not otherwise be discoverable by browsing the site.
+
+  **This is obscurity, not privacy.** The page is a normal, public HTML file
+  with no access control - anyone who has or guesses the URL can read it,
+  and it will become fully discoverable the moment it is linked from any
+  page search engines do index (including, e.g., pasting the link
+  somewhere public). Do not use `unlisted` for anything that needs to stay
+  actually private.
+
+  `tests/unlisted.test.mjs` pins this behaviour end-to-end against a
+  temporary fixture page (written before the build, removed after).
+
 ## Project Structure
 
 This is a Zola static site generator project with gwern.net-inspired typography:

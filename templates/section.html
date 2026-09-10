@@ -6,7 +6,7 @@ description %} {% block content %}
   <header><h1>{{ section.title }}</h1></header>
   <div class="article-body">{{ section.content | safe }}</div>
   <ul class="post-list">
-    {% for page in section.pages %}
+    {% for page in section.pages %} {% if not page.extra.unlisted %}
     <li>
       <a href="{{ page.permalink }}">{{ page.title }}</a>
       <span class="post-meta">
@@ -19,7 +19,7 @@ description %} {% block content %}
         >{{ page.description }}</span
       >{% endif %}
     </li>
-    {% endfor %}
+    {% endif %} {% endfor %}
   </ul>
 </article>
 {% endblock content %}

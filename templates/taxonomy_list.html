@@ -3,12 +3,14 @@ title %} {% block content %}
 <article id="article">
   <header><h1>Tags</h1></header>
   <ul class="post-list">
-    {% for term in terms %}
+    {% for term in terms %} {% set_global visible = 0 %} {% for page in
+    term.pages %} {% if not page.extra.unlisted %} {% set_global visible =
+    visible + 1 %} {% endif %} {% endfor %} {% if visible > 0 %}
     <li>
       <a href="{{ term.permalink }}">{{ term.name }}</a>
-      <span class="post-meta">{{ term.pages | length }}</span>
+      <span class="post-meta">{{ visible }}</span>
     </li>
-    {% endfor %}
+    {% endif %} {% endfor %}
   </ul>
 </article>
 {% endblock content %}

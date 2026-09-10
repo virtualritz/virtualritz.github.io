@@ -3,8 +3,9 @@
   <header><h1>{{ config.title }}</h1></header>
   <div class="article-body">{{ section.content | safe }}</div>
   <ul class="post-list">
-    {% set essays = get_section(path="essays/_index.md") %} {% for page in
-    essays.pages[:10] %}
+    {% set essays = get_section(path="essays/_index.md") %} {% set_global shown
+    = 0 %} {% for page in essays.pages %} {% if shown >= 10 %}{% break %}{%
+    endif %} {% if not page.extra.unlisted %}
     <li>
       <a href="{{ page.permalink }}">{{ page.title }}</a>
       <span class="post-meta">
@@ -16,7 +17,7 @@
         >{{ page.description }}</span
       >{% endif %}
     </li>
-    {% endfor %}
+    {% set_global shown = shown + 1 %} {% endif %} {% endfor %}
   </ul>
 </article>
 {% endblock content %}

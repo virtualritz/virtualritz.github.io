@@ -8,6 +8,9 @@
       name="description"
       content="{% block description %}{{ config.description }}{% endblock description %}"
     />
+    {% if page is defined and page.extra.unlisted %}
+    <meta name="robots" content="noindex, nofollow" />
+    {% endif %}
     <link rel="stylesheet" href="{{ get_url(path='style.css') }}" />
     <link
       rel="alternate"

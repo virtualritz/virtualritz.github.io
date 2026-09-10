@@ -3,7 +3,7 @@
 <article id="article">
   <header><h1>{{ term.name }}</h1></header>
   <ul class="post-list">
-    {% for page in term.pages %}
+    {% for page in term.pages %} {% if not page.extra.unlisted %}
     <li>
       <a href="{{ page.permalink }}">{{ page.title }}</a>
       <span class="post-meta">
@@ -12,7 +12,7 @@
         >{% endif %}
       </span>
     </li>
-    {% endfor %}
+    {% endif %} {% endfor %}
   </ul>
 </article>
 {% endblock content %}

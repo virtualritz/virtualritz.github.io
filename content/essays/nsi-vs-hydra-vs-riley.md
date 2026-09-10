@@ -2,7 +2,12 @@
 title = "Hydra, NSI and Riley: three ways to put a renderer behind an API"
 date = 2026-09-08
 description = "An architectural review of Hydra and NSI, with Pixar's Riley as a control: three ways to put a renderer behind an API."
-draft = true
+
+[extra]
+# Reachable at its own URL for review, but linked from nowhere: absent
+# from the homepage, the essays listing, every tag page and the sitemap,
+# and served with a noindex robots meta. See tests/unlisted.test.mjs.
+unlisted = true
 
 [taxonomies]
 tags = ["rendering", "api-design", "openusd", "renderman", "nsi", "architecture"]

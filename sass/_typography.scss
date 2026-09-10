@@ -197,6 +197,27 @@
     padding-inline-end: var(--sentence-gap);
   }
 
+  // A superscript must not change the leading of the line it sits on.
+  // The browser default for <sup> is `vertical-align: super`, which raises
+  // the inline box itself: the box's top now sits above the line's normal
+  // ascent, the line box grows to contain it, and that one line is leaded
+  // differently from every other. Measured on this essay before the fix,
+  // at the 895px measure: the single paragraph carrying a footnote
+  // reference was 83.81px tall where two lines are 2 x 37.92 = 75.84px —
+  // 8px of extra leading, 21% of a line, on one line of one paragraph.
+  //
+  // `line-height: 0` makes the superscript contribute no height to the
+  // line box at all, and the raise is then done with relative positioning,
+  // which is a paint-time offset and never feeds back into layout. The
+  // glyph lands in the same place; the line does not move.
+  sup {
+    font-size: 0.72em;
+    line-height: 0;
+    position: relative;
+    top: -0.42em;
+    vertical-align: baseline;
+  }
+
   .small-caps {
     font-variant: small-caps;
     letter-spacing: 0.02em;

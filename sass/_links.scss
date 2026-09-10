@@ -40,7 +40,14 @@
 .article-body a[target="_blank"]::after {
   content: "\2197";
   font-size: 0.62em;
-  vertical-align: super;
+  // Raised without `vertical-align: super`, for the same reason as the
+  // footnote reference in sass/_typography.scss — see the comment there.
+  // A raised inline box grows the line box it sits in, so a line carrying
+  // an external link would be leaded differently from its neighbours.
+  line-height: 0;
+  position: relative;
+  top: -0.42em;
+  vertical-align: baseline;
   margin-left: 0.08em;
   opacity: 0.5;
   text-shadow: none;

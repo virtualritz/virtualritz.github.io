@@ -114,3 +114,34 @@ test("the essay renders its title once, from frontmatter", async () => {
   assert.equal((html.match(/<h1/g) || []).length, 1);
   assert.match(html, /Setting this site/);
 });
+
+test("a superscript does not change the leading of its line", async () => {
+  const c = await css();
+  // The browser default for <sup> is `vertical-align: super`, which raises
+  // the inline box: the line box grows to contain it and that one line
+  // gets extra leading. Measured on essays/typography before the fix, at
+  // the 895px measure, the paragraph carrying a footnote reference was
+  // 83.81px where two lines are 2 x 37.92 = 75.84px — 8px of stray
+  // leading. `line-height: 0` keeps the superscript from contributing any
+  // height, and the raise moves to relative positioning, which is a
+  // paint-time offset that never feeds back into layout.
+  const sup = c.match(/\.article-body sup\{([^}]*)\}/)[1];
+  assert.match(sup, /line-height:0/);
+  assert.match(sup, /position:relative/);
+  assert.doesNotMatch(sup, /vertical-align:\s*super/);
+  assert.match(sup, /vertical-align:baseline/);
+});
+
+test("the external-link arrow does not change the leading of its line either", async () => {
+  const c = await css();
+  // Same defect, same fix: the arrow is generated content raised above the
+  // line, so without this a line carrying an external link would be leaded
+  // differently from its neighbours. The NSI essay has 125 paragraphs with
+  // external links, so this is the higher-traffic half of the bug.
+  const arrow = c.match(
+    /\.article-body a\[rel~=["']?noopener["']?\]::after[^{]*\{([^}]*)\}/,
+  )[1];
+  assert.match(arrow, /line-height:0/);
+  assert.match(arrow, /position:relative/);
+  assert.doesNotMatch(arrow, /vertical-align:\s*super/);
+});

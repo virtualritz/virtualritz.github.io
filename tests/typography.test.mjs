@@ -27,7 +27,7 @@ test("paragraphs are flush with a gap; .para-indent marks a hard-break continuat
   );
 });
 
-test("headings use the drop-cap face, not small-caps; h1 has a solid rule, h2 uppercase with a dotted rule", async () => {
+test("headings use the drop-cap face in normal case; h1 has a solid rule, h2 a dotted one", async () => {
   const c = await css();
   // Headings are scoped to #article, not .article-body: the frontmatter
   // <h1> lives in <header>, a sibling of .article-body, so a
@@ -50,7 +50,10 @@ test("headings use the drop-cap face, not small-caps; h1 has a solid rule, h2 up
   );
   assert.match(h1, /border-bottom:\s*0?\.8px solid/);
   const h2 = c.match(/#article h2\{([^}]*)\}/)[1];
-  assert.match(h2, /text-transform:\s*uppercase/);
+  // Article headings are set in normal case. The uppercasing that used to
+  // live here was tuned for EB Garamond; on Thunder VF at 36px it reads as
+  // shouting, and the owner asked for normal case.
+  assert.doesNotMatch(h2, /text-transform:\s*uppercase/);
   assert.match(h2, /border-bottom:\s*0?\.8px dotted/);
 });
 

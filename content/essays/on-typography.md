@@ -5,12 +5,6 @@ description = "Reflections on digital typography, readability, and the evolution
 
 [taxonomies]
 tags = ["typography", "design", "web", "reading"]
-
-[extra]
-epistemic_status = "Exploratory; based on years of reading and implementation experience"
-backlinks = [
-    {title = "Design of This Website", url = "/essays/gwern-style-demo/"}
-]
 +++
 
 Typography on the web has evolved from the crude bitmap fonts of early terminals to sophisticated rendering engines capable of matching---and in some ways exceeding---print quality[^1]. Yet most websites still treat text as an afterthought, a mere vessel for content rather than an integral part of the reading experience.

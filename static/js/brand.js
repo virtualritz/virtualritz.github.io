@@ -1,53 +1,44 @@
 /**
  * Animates the nav brand's letters along Thunder VF's weight axis, the way
  * the Typeface Bench specimen (docs/specimen/typeface-bench.html) animated
- * its headline. Wave parameters are carried over from that page unchanged
- * — it is the one the site's faces were chosen on, so matching it is the
- * point, not a coincidence.
+ * its headline — including *how* it draws them.
+ *
+ * It draws SVG outlines, not text. An earlier version animated
+ * `font-weight` on per-letter spans, which is simpler and was wrong: Skia
+ * caches rasterised glyphs on a quantised grid, so the weight steps
+ * between cached bitmaps instead of gliding. At the nav's old ~13px that
+ * was imperceptible, which is why the shortcut looked fine; at the
+ * masthead's 132px it reads as a twitch. Paths have no glyph cache — each
+ * frame is rasterised from geometry — so the motion is continuous. The
+ * specimen reached this conclusion first and said so in its own comments.
+ *
+ * Interpolation is exact, not approximate; see lib/thunder-outline.js and
+ * build/thunder-paths.py for why a single delta set suffices.
  *
  * Loaded from templates/base.html rather than from main.js: the nav is on
- * every page, main.js only on essays. It has no ordering relationship to
- * the article pipeline (it never touches .article-body), so it is a plain
- * independent module rather than another link in typography.js's chain.
+ * every page, main.js only on essays.
  *
  * No-JS: base.html renders the brand as ordinary link text and
- * sass/_typography.scss uppercases it and sets it in Thunder at a fixed
- * weight, so the brand looks deliberate with the script absent — the
- * animation is the enhancement, the typography is not.
- *
- * Two things a naive version gets wrong, both learned from the specimen:
- *
- * 1. A glyph's advance changes with its weight, so animating weight on
- *    natural advances makes the word breathe and slide — and here it would
- *    drag Essays/Projects/About along with it, since the nav is a flex row
- *    and the brand is its first item. Each letter is therefore pinned to
- *    the advance it has at mid-weight and centred in that box, exactly the
- *    fixed-advance layout the specimen used. The word's total width then
- *    never changes and the rest of the nav holds still.
- *
- * 2. Skia caches rasterised glyphs on a 0.25px horizontal / 1px vertical
- *    grid, so CSS weight animation snaps rather than glides. The specimen
- *    answered that by rasterising outlines itself from a 7KB delta set;
- *    that is worth it for a 200px headline and not for a ~13px nav brand,
- *    where a quarter-pixel is well under a stem width. The CSS path is
- *    what runs here.
+ * sass/_typography.scss sets it in Thunder, uppercase, at the same size,
+ * so the wordmark looks deliberate with the script absent. The text stays
+ * in the DOM when the SVG is built, too — it is what a screen reader
+ * announces and what copy/paste yields; only its pixels are hidden.
  */
-import { waveWeight, WGHT } from "./lib/brand-wave.js";
+import PATHS from "./lib/thunder-paths.js";
+import { glyphPath, layout, weightT } from "./lib/thunder-outline.js";
 
-// theme.js's development-only "JS: off" switch previews the CSS-only
-// rendering; the brand's static, unsplit state is part of that.
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 const brand = document.documentElement.classList.contains("nojs-sim")
   ? null
   : document.querySelector("#brand");
 
 // prefers-reduced-motion softens the wave rather than stopping it, which
-// is what the specimen did. Stopping it outright was the earlier choice
+// is what the specimen did. Stopping it outright was an earlier choice
 // here and it was wrong twice over: the owner asks for this animation and
 // could not see it running, and a weight wave is not the kind of motion
 // the preference exists to guard against — nothing translates, scales or
-// flashes; only stroke thickness changes, in place, on eleven letters.
-// Measured on the live site before this change: normal rendering produced
-// 6 distinct pixel frames out of 6 samples, reduced-motion exactly 1.
+// flashes; only stroke thickness changes, in place.
 const reduce =
   window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -55,77 +46,101 @@ const reduce =
 const FREQ = reduce ? 0.06 : 0.35; // Hz
 const AMP = reduce ? 0.75 : 1; // fraction of the 100-900 axis range
 const SPREAD = 0.55; // radians of phase per letter
+const MIN = 100;
+const MAX = 900;
+const MID = 500;
 
-if (brand) {
-  // Spaces stay ordinary text nodes rather than becoming cells, as in the
-  // specimen's buildHeadline. A cell is an inline-block, and an
-  // inline-block whose only content is a space collapses that space to
-  // nothing — the word-gap in "Virtual Ritz" simply disappears.
+if (brand && PATHS.g[PATHS.text.replace(/ /g, "")[0]] !== undefined) {
+  // Fixed advances from the mid-axis instance: a glyph's advance grows
+  // with its weight, so live advances would make the word breathe and
+  // slide. Computed once and never again.
+  const lay = layout(PATHS, MID);
+
+  // Ascender headroom, in font units, matching the specimen's framing.
+  const top = -0.8 * PATHS.upem;
+  const vbHeight = 1.04 * PATHS.upem;
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute(
+    "viewBox",
+    `0 ${top.toFixed(0)} ${lay.width.toFixed(0)} ${vbHeight.toFixed(0)}`,
+  );
+  svg.setAttribute("preserveAspectRatio", "xMinYMin meet");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  // Sized in em so it tracks #brand's own clamp() font-size exactly as the
+  // text it replaces did, rather than filling the measure.
+  svg.style.width = `${(lay.width / PATHS.upem).toFixed(4)}em`;
+  svg.style.height = "auto";
+  svg.style.display = "block";
+  svg.style.overflow = "visible";
+
+  // Font coordinates are y-up; SVG is y-down.
+  const flip = document.createElementNS(SVG_NS, "g");
+  flip.setAttribute("transform", "scale(1,-1)");
+  svg.append(flip);
+
   const cells = [];
-  const nodes = [...brand.textContent].map((ch) => {
-    if (ch === " ") return document.createTextNode(" ");
-    const s = document.createElement("span");
-    s.className = "brand-cell";
-    s.textContent = ch;
-    cells.push(s);
-    return s;
-  });
-  brand.textContent = "";
-  brand.append(...nodes);
+  for (const slot of lay.slots) {
+    if (slot.ch === " ") continue;
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("fill", "currentColor");
+    path.setAttribute("transform", `translate(${slot.x.toFixed(1)},0)`);
+    flip.append(path);
+    cells.push({ ch: slot.ch, path });
+  }
 
-  // Advances are only meaningful once the real face has loaded; measured
-  // against the fallback they would pin every letter to the wrong box.
-  // document.fonts.ready settles even if the font fails, in which case the
-  // widths are simply the fallback's own and stay self-consistent.
-  document.fonts.ready.then(() => {
-    for (const s of cells) s.style.fontWeight = String(WGHT.mid);
-    // Read every width before writing any, so the first assignment does
-    // not invalidate layout for the measurements still to come.
-    const widths = cells.map((s) => s.getBoundingClientRect().width);
-    cells.forEach((s, i) => {
-      s.style.width = widths[i].toFixed(3) + "px";
+  // Move the anchor's own text into a span so CSS can hide its pixels. It
+  // is a bare text node otherwise, and a text node cannot be selected —
+  // and it must stay in the DOM regardless: it is the link's accessible
+  // name and what copy/paste yields.
+  const text = document.createElement("span");
+  text.className = "brand-text";
+  text.append(...brand.childNodes);
+  brand.append(text, svg);
+  brand.classList.add("has-outline");
+
+  const paint = (t) => {
+    cells.forEach(({ ch, path }, i) => {
+      const half = (AMP * (MAX - MIN)) / 2;
+      let v = MID + half * Math.sin(2 * Math.PI * FREQ * t + i * SPREAD);
+      v = Math.max(MIN, Math.min(MAX, v));
+      path.setAttribute("d", glyphPath(PATHS, ch, weightT(v)));
     });
+  };
 
-    let t0 = 0;
-    let raf = 0;
-    const frame = (now) => {
-      if (!t0) t0 = now;
-      const t = (now - t0) / 1000;
-      cells.forEach((s, i) => {
-        s.style.fontWeight = waveWeight(t, i, {
-          freq: FREQ,
-          amp: AMP,
-          spread: SPREAD,
-        }).toFixed(0);
-      });
-      raf = requestAnimationFrame(frame);
-    };
+  paint(0);
 
-    // Run only while the brand is actually on screen and the tab is
-    // frontmost. rAF already stops in a background tab, but a long page
-    // scrolled past the nav would otherwise keep repainting glyphs nobody
-    // can see. Restarting resets t0, so the wave resumes from a flat
-    // phase rather than jumping to wherever it would have been.
-    const stop = () => {
-      cancelAnimationFrame(raf);
-      raf = 0;
-    };
-    const start = () => {
-      if (raf) return;
-      t0 = 0;
-      raf = requestAnimationFrame(frame);
-    };
+  let t0 = 0;
+  let raf = 0;
+  const frame = (now) => {
+    if (!t0) t0 = now;
+    paint((now - t0) / 1000);
+    raf = requestAnimationFrame(frame);
+  };
 
-    let onScreen = true;
-    const sync = () => (onScreen && !document.hidden ? start() : stop());
+  // Run only while the brand is on screen and the tab is frontmost. rAF
+  // already stops in a background tab, but a long page scrolled past the
+  // masthead would otherwise keep rasterising outlines nobody can see.
+  const stop = () => {
+    cancelAnimationFrame(raf);
+    raf = 0;
+  };
+  const start = () => {
+    if (raf) return;
+    t0 = 0;
+    raf = requestAnimationFrame(frame);
+  };
 
-    document.addEventListener("visibilitychange", sync);
-    if (window.IntersectionObserver) {
-      new IntersectionObserver((entries) => {
-        onScreen = entries[entries.length - 1].isIntersecting;
-        sync();
-      }).observe(brand);
-    }
-    sync();
-  });
+  let onScreen = true;
+  const sync = () => (onScreen && !document.hidden ? start() : stop());
+
+  document.addEventListener("visibilitychange", sync);
+  if (window.IntersectionObserver) {
+    new IntersectionObserver((entries) => {
+      onScreen = entries[entries.length - 1].isIntersecting;
+      sync();
+    }).observe(brand);
+  }
+  sync();
 }

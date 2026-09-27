@@ -72,18 +72,75 @@ test("brand.js is loaded from base.html, so the nav animates on every page", asy
   }
 });
 
-test("the brand is set in the display face, uppercased, with pinned letter boxes", async () => {
+test("the brand is set in the display face, uppercased, at specimen size", async () => {
   const c = (await buildSite()).read("style.css");
   const brand = c.match(/#masthead #brand\{([^}]*)\}/)[1];
   assert.match(brand, /font-family:var\(--initial\)/);
   assert.match(brand, /text-transform:uppercase/);
   // Sized as a display headline, on the Typeface Bench specimen's own
   // metrics (docs/specimen/typeface-bench.html, `.hl`): at the nav's text
-  // size the weight wave ran but was too small to read as motion.
+  // size the weight wave ran but was too small to read as motion. This
+  // rule is also what a no-JS visitor sees, since the outline SVG that
+  // replaces the text is only ever built by script.
   assert.match(brand, /font-size:clamp\(52px,\s*11vw,\s*132px\)/);
-  // A letter's advance grows with its weight; without a fixed, centred box
-  // the word would breathe and shove the masthead about every frame.
-  const cell = c.match(/\.brand-cell\{([^}]*)\}/)[1];
-  assert.match(cell, /display:inline-block/);
-  assert.match(cell, /text-align:center/);
+});
+
+test("the wordmark's text survives being replaced by outlines", async () => {
+  const c = (await buildSite()).read("style.css");
+  // brand.js hides the anchor's own text once it has drawn the SVG, but
+  // only its pixels: clip-path keeps it in the accessibility tree as the
+  // link's name and as what copy/paste yields, where display:none or
+  // visibility:hidden would remove it from both.
+  const rule = c.match(/#brand\.has-outline \.brand-text\{([^}]*)\}/)[1];
+  assert.match(rule, /clip-path:inset\(50%\)/);
+  assert.doesNotMatch(rule, /display:none|visibility:hidden/);
+});
+
+// --- outline geometry ----------------------------------------------------
+
+test("a glyph's outline interpolates between the two masters", async () => {
+  const { glyphPath, weightT, layout } =
+    await import("../static/js/lib/thunder-outline.js");
+  const { default: PATHS } = await import("../static/js/lib/thunder-paths.js");
+  // The axis default is 900 and the delta master is 100, so t runs 0 -> 1
+  // as the weight goes heavy -> light.
+  assert.equal(weightT(900), 0);
+  assert.equal(weightT(100), 1);
+  assert.equal(weightT(500), 0.5);
+
+  const heavy = glyphPath(PATHS, "V", weightT(900));
+  const light = glyphPath(PATHS, "V", weightT(100));
+  const mid = glyphPath(PATHS, "V", weightT(500));
+  assert.notEqual(heavy, light);
+  assert.notEqual(mid, heavy);
+  assert.notEqual(mid, light);
+  assert.match(heavy, /^M[-\d.]+ [-\d.]+/);
+  // Every weight yields the same command sequence — only coordinates move.
+  const shape = (d) => d.replace(/[-\d.]+/g, "");
+  assert.equal(shape(heavy), shape(light));
+});
+
+test("every letter of the wordmark has geometry, and nothing else rides along", async () => {
+  const { default: PATHS } = await import("../static/js/lib/thunder-paths.js");
+  const needed = [...new Set(PATHS.text.replace(/ /g, ""))].sort();
+  assert.deepEqual(Object.keys(PATHS.g).sort(), needed);
+  assert.equal(PATHS.text, "VIRTUAL RITZ");
+});
+
+test("letters sit on fixed advances, so the word cannot breathe", async () => {
+  const { layout } = await import("../static/js/lib/thunder-outline.js");
+  const { default: PATHS } = await import("../static/js/lib/thunder-paths.js");
+  // The layout is taken once at mid weight and reused; a glyph's advance
+  // grows with its weight, so laying out per-frame would slide the word
+  // sideways under the wave.
+  const mid = layout(PATHS, 500);
+  const heavy = layout(PATHS, 900);
+  assert.notEqual(mid.width, heavy.width, "advances do vary with weight");
+  assert.equal(mid.slots.length, PATHS.text.length);
+  let x = 0;
+  for (const s of mid.slots) {
+    assert.equal(s.x, x);
+    x += s.adv;
+  }
+  assert.equal(mid.width, x);
 });

@@ -44,11 +44,13 @@ const LINES = 3;
 // zero-height strut in the element reports a baseline that measures level
 // with the third line to 0.047px — yet the rendered cap plainly sits above
 // that line. Measured in Krita against a rule drawn on the body baseline,
-// at 100% and at 175% browser zoom, it is ~3px either way, which is why
+// at 100% and at 175% browser zoom, it read as ~3px; 3 overshot and 1.5
+// is where it sits, which is also what a rule drawn at the measured
+// baseline showed here. That is why
 // this is a constant in CSS px rather than something derived: a CSS-px
 // offset holds at every zoom, and the discrepancy it absorbs is a
 // rasterisation residual no metric on offer reports correctly.
-const CAP_BASELINE_NUDGE_PX = 3;
+const CAP_BASELINE_NUDGE_PX = 1.5;
 // Both were optical nudges, and together they pushed the cap's baseline
 // 7% of the cap box below the third line's baseline — about 6.5px at the
 // 24px/1.58 body, plainly visible as a drop cap sitting lower than the

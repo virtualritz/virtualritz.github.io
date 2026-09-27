@@ -298,18 +298,20 @@
   }
 }
 
-// One letter of the brand. brand.js pins an explicit px width here once
-// the face has loaded — a glyph's advance grows with its weight, and
-// without a fixed box the word would breathe, which at this size would
-// visibly shove the whole masthead about every frame. Centring is what
-// makes a letter thicken symmetrically inside that fixed box instead of
-// growing rightwards. Ligatures are off because a per-letter split already
-// prevents them: saying so keeps the no-JS rendering identical to the
-// measured one.
-.brand-cell {
-  display: inline-block;
-  text-align: center;
-  font-variant-ligatures: none;
+// Once brand.js has drawn the wordmark as SVG outlines, the anchor's own
+// text is hidden — but only visually. It stays in the DOM as the link's
+// accessible name and as what copy/paste yields, and it is what a no-JS
+// visitor sees, set in Thunder at the same size by the rule above.
+#brand.has-outline {
+  position: relative;
+  line-height: 0;
+
+  // clip-path rather than display/visibility, both of which would take the
+  // text out of the accessibility tree along with the pixels.
+  .brand-text {
+    position: absolute;
+    clip-path: inset(50%);
+  }
 }
 
 #site-nav {

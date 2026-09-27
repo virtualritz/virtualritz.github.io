@@ -10,9 +10,12 @@ serve:
 test:
     npm test
 
-# Regenerate self-hosted fonts (needs python3 + fontTools)
+# Regenerate self-hosted fonts, and the brand's outline data with them
+# (needs python3 + fontTools) — the outlines are extracted from Thunder VF,
+# so they must be regenerated whenever that file changes.
 fonts:
     python3 build/fonts.py
+    python3 build/thunder-paths.py
 
 # Everything CI runs, plus `fonts` (which CI does not run)
 check: fonts build test

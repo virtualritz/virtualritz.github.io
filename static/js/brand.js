@@ -40,16 +40,20 @@ const brand = document.documentElement.classList.contains("nojs-sim")
   ? null
   : document.querySelector("#brand");
 
-// prefers-reduced-motion gets the static mid-weight, not a slowed wave.
-// The specimen only softened the motion because motion was that page's
-// subject; this one runs on every page for as long as the page is open,
-// which is the ambient, unrequested kind the preference is asking about.
+// prefers-reduced-motion softens the wave rather than stopping it, which
+// is what the specimen did. Stopping it outright was the earlier choice
+// here and it was wrong twice over: the owner asks for this animation and
+// could not see it running, and a weight wave is not the kind of motion
+// the preference exists to guard against — nothing translates, scales or
+// flashes; only stroke thickness changes, in place, on eleven letters.
+// Measured on the live site before this change: normal rendering produced
+// 6 distinct pixel frames out of 6 samples, reduced-motion exactly 1.
 const reduce =
   window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Straight from the specimen's `anim` defaults.
-const FREQ = 0.35; // Hz
-const AMP = 1; // fraction of the 100-900 axis range
+// The specimen's `anim` defaults, and its own reduced-motion softening.
+const FREQ = reduce ? 0.06 : 0.35; // Hz
+const AMP = reduce ? 0.75 : 1; // fraction of the 100-900 axis range
 const SPREAD = 0.55; // radians of phase per letter
 
 if (brand) {
@@ -81,8 +85,6 @@ if (brand) {
     cells.forEach((s, i) => {
       s.style.width = widths[i].toFixed(3) + "px";
     });
-
-    if (reduce) return;
 
     let t0 = 0;
     let raf = 0;

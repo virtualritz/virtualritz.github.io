@@ -237,7 +237,16 @@ async function place(article) {
   const box = document.createElement("span");
   box.className = "dropcap-box";
   box.style.width = `${g.inkRight + bodySize * 0.7}px`;
-  box.style.height = `${g.lines * g.lineHeightPx}px`;
+  // A hair under the exact multiple, deliberately. At exactly
+  // `lines * lineHeight` the float's bottom edge and the next line box's
+  // top edge land on the identical coordinate, and whether that line is
+  // intruded is then decided by how the tie rounds through Chrome's
+  // 1/64px layout grid and the device-pixel grid — which changes with
+  // browser zoom. Observed: three indented lines at 100-175%, four at
+  // 200%, three again at 250%. Half a CSS pixel is invisible at any zoom
+  // and is larger than either rounding step (1/64px, and 1/3px at 3x
+  // device scale), so the tie can no longer go the wrong way.
+  box.style.height = `${(g.lines * g.lineHeightPx - 0.5).toFixed(2)}px`;
 
   const glyph = document.createElement("span");
   glyph.className = "dropcap";

@@ -60,7 +60,7 @@ test("an unlisted page is absent from the essays section listing", async () => {
   assert.doesNotMatch(html, new RegExp(FIXTURE_TITLE));
   assert.doesNotMatch(html, new RegExp(FIXTURE_SLUG));
   // sanity: a normal, listed essay must still be there
-  assert.match(html, /Setting this site/);
+  assert.match(html, /Setting This Site/);
 });
 
 test("an unlisted page is absent from sitemap.xml", async () => {

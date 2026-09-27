@@ -1,5 +1,5 @@
 +++
-title = "Hydra, NSI and Riley: three ways to put a renderer behind an API"
+title = "Hydra, NSI and Riley: Three Ways to Put a Renderer Behind an API"
 date = 2026-09-08
 description = "An architectural review of Hydra and NSI, with Pixar's Riley as a control: three ways to put a renderer behind an API."
 
@@ -199,7 +199,7 @@ NSI's `instances` node takes matrices, model indices and per-instance attributes
 
 HydraNSI's author on instancing, from [`pointInstancer.h`](https://gitlab.com/3Delight/HydraNSI/-/blob/master/hdNSI/pointInstancer.h#L19): "The way this works in Hydra is a little awkward. The instancers are not first class primitives ... This is likely another kludge inherited from the needs of the GL renderer." And in [`pointInstancer.cpp`](https://gitlab.com/3Delight/HydraNSI/-/blob/master/hdNSI/pointInstancer.cpp#L208): "we attempt to rebuild USD instancing indices from Hydra's scrambled idea of what instancing should be like. Hydra has no way of grouping several pieces of geometry together for instancing. Instead, they will show up as separate prototypes but each have the same instance indices array." The delegate [hashes identical index arrays](https://gitlab.com/3Delight/HydraNSI/-/blob/master/hdNSI/pointInstancer.cpp#L230) to reconstruct grouping that existed in USD and disappeared in Hydra.
 
-## Output, settings, and everything a viewport does not need
+## Output, Settings, and Everything a Viewport Does Not Need
 
 Hydra's viewport origin shows most clearly here. None of this is a bug. It is what happens when a viewport has to file your dailies.
 
@@ -241,7 +241,7 @@ Shutter is `shutterrange` and `shutteropening` on the camera.
 
 That is the motion-blur API.
 
-## Change over time, and C vs. C++
+## Change over Time, and C vs. C++
 
 If you ship software for money, this section probably decides it.
 
@@ -269,7 +269,7 @@ Hydra has no C boundary because it was never meant to have one. Riley has no C b
 
 Hydra is the internal architecture of a viewport that was later declared an interface. Riley is the internal architecture of a renderer that was published with a disclaimer. NSI is an interface that was designed as one.
 
-## Serialization and debuggability
+## Serialization and Debuggability
 
 Because NSI calls are self-contained data, the API is [its own file format](https://nsi.readthedocs.io/en/latest/stream-api.html). `NSIBegin` with a `streamfilename` writes every subsequent call as text or binary. `NSIEvaluate` reads it back. A `procedural` node defers it. The 3Delight for Houdini plugin uses this to write a [`.static` sidecar](https://gitlab.com/3Delight/3delight-for-houdini/-/blob/master/ROP_3Delight.cpp#L708) of time-independent attributes shared across a frame sequence. HydraNSI uses it to [turn itself into a USD-to-NSI exporter](https://gitlab.com/3Delight/HydraNSI/-/blob/master/hdNSI/renderDelegate.cpp#L413) with one environment variable. When a render comes out wrong you dump the stream, read it, diff it against yesterday's and edit it by hand. And hand-editing works, because every line is a complete, self-contained call. Delete a line, duplicate one, move one, and the stream still parses. There is no block to close.
 
@@ -287,7 +287,7 @@ Pixels come back the RIB way, through `ndspy` display drivers registered with [`
 
 Progress and convergence: Riley has none. There is a separate [`RixEventCallbacks`](https://renderman.pixar.com/resources/rman27/classRixEventCallbacks.html) interface, itself marked "preview release", with a 0 to 100 progress integer. hdPrman sets `_converged = true` when `Render()` returns. NSI has `stoppedcallback` and `progresscallback` as `RenderControl` arguments.
 
-## The third API: Riley, and a note on the word RenderMan
+## The Third API: Riley, and a Note on the Word RenderMan
 
 First the word, because it has quietly changed meaning and the change matters for everything below.
 
@@ -313,7 +313,7 @@ And it needed replacing for a reason beyond quirks. RI is a stack machine. `Attr
 
 Keep that in mind when you read "RenderMan" below. It means `libprman`.
 
-### What Riley is
+### What Riley Is
 
 Riley is RenderMan's scene API, [introduced in RenderMan 22](https://www.fxguide.com/fxfeatured/look-at-renderman-22-and-beyond/) in 2018 as the replacement for the RIB double-buffer path: "a new modern render interface, Riley, which is much faster than the traditional RIB pipeline". It is a C++ abstract class, [`riley::Riley`](https://renderman.pixar.com/resources/rman27/classRiley.html), with `Create`, `Modify` and `Delete` for each entity type: cameras, geometry prototypes, geometry instances, materials, displacements, light shaders, light instances, integrators, coordinate systems, render outputs, render targets, displays, render views, display filters, sample filters. Plus `SetOptions`, `Render`, `Stop` and `RequestUpdate`.
 
@@ -321,7 +321,7 @@ That list is NSI in C++: push, explicit creation, modification and deletion of r
 
 Handles are typed opaque integers rather than NSI's strings, which is a legitimate design choice and probably the better one for a C++ API. Geometry type is a string, the RI primitive set. Primvars go in an `RtPrimVarList` with explicit detail, which is better than NSI's count inference.
 
-### Why it looks like this
+### Why It Looks Like This
 
 I had assumed, for years, that NSI was passed over at Pixar for the usual reason. In April 2021 Philippe Leprince, then on the RenderMan team at Pixar, and someone I had worked with at DNeg in London in 2007 and 2008, set me straight in a private chat. I quote with the caveat that it was a chat:
 
@@ -339,7 +339,7 @@ Riley is Ri-shaped because Pixar's largest customer is Pixar. That is a perfectl
 
 The rest is where it falls down.
 
-### What Pixar did with it
+### What Pixar Did with It
 
 **It has been "not yet stable" for eight years.** The RenderMan 24 and [26 Developers' Guides](https://rmanwiki-26.pixar.com/space/REN26/19662207/Developers'+Guide) both say: "Please note the new interactive API (Riley) introduced in RenderMan 22 is not yet stable." The [26 API changes page](https://renderman.atlassian.net/wiki/spaces/REN26/pages/19661991/API+Changes+from+25.X+to+26.X): "As of PRMan 26.0, Riley should still be considered an unstable interface" and "The Riley header file version has been incremented to 0.4." The [header itself](https://renderman.pixar.com/resources/rman26/Riley_8h_source.html) opens with: "This is a preview release and is not supported. This API will change substantially in the next release of RenderMan. Names, namespaces, methods, parameters, types, enums, and the structure of the interface itself are expected to change." That paragraph has shipped, unchanged, since 2018.
 
@@ -359,7 +359,7 @@ NSI has been at `NSI_VERSION 2` with eleven functions since the 2018 spec. Riley
 
 Compare: four open-source DCC exporters target NSI, plus a Rust workspace, plus a second renderer.
 
-### What Pixar's bridges actually do today
+### What Pixar's Bridges Actually Do Today
 
 As far as public documentation goes, and Pixar does not document internals, so I will take corrections:
 
@@ -370,19 +370,19 @@ As far as public documentation goes, and Pixar does not document internals, so I
 
 One of four Pixar bridges goes through Hydra for final frames, and only because SideFX built Solaris around it. The other three are direct translators on Pixar's push API, exactly as the 3Delight plugins are on NSI. Pixar's own products make the same choice this post does.
 
-### What RIB became
+### What RIB Became
 
 RIB is not deprecated. It is demoted. [`prman frame.rib`](https://rmanwiki-26.pixar.com/space/REN26/19661967/prman) still works in 26, batch renders from Maya [still spool RIB](https://rmanwiki-26.pixar.com/space/RFM26/21037128/Batch+Rendering+in+Maya) to the farm, and cgchannel's read on 22 was that its use "will presumably be wound down over time". What RenderMan 27 [deprecated in November 2025](https://www.cgchannel.com/2025/11/pixar-releases-renderman-27/) is RIS itself, the CPU integrator, in favour of XPU. Which, per Pixar's own NURBS page, [does not and will not support NURBS](https://rmanwiki-26.pixar.com/space/REN26/19661437/NURBS).
 
 The 1989 file format outlives the 2014 renderer core. Text formats do that.
 
-### Riley in one paragraph
+### Riley in One Paragraph
 
 Riley is what NSI would be if you designed it in C++ instead of C, never published a spec, marked it unstable for eight years, kept the write-only nature undocumented, left serialization to the format it was meant to replace, put a second unstable layer on top for your own bridges, and then needed 2.2 MB of adapter to connect it to the framework you told everyone else to use.
 
 The architecture is right. Everything around it is why nobody but Gaffer bothered.
 
-## Case study one: HydraNSI
+## Case Study One: HydraNSI
 
 [HydraNSI](https://gitlab.com/3Delight/HydraNSI) is the useful experiment: a Hydra delegate mapping onto NSI, maintained by NSI's principal designer.
 
@@ -402,7 +402,7 @@ Second, and this one is the real finding: the delegate works because NSI is idem
 
 The flat, handle-addressed graph is quietly doing the work the framework was supposed to do.
 
-## Case study two: the direct exporters
+## Case Study Two: The Direct Exporters
 
 [3Delight for Maya](https://gitlab.com/3Delight/3DFM) and [3Delight for Houdini](https://gitlab.com/3Delight/3delight-for-houdini) are the other half of the experiment: what a DCC integration looks like when it targets NSI directly.
 
@@ -420,7 +420,7 @@ The cost of this thinness is visible too. When NSI lacked a concept the exporter
 
 Hydra's change tracker would have handed it one. Credit where it is due.
 
-## Case study three: NSI as the viewport
+## Case Study Three: NSI as the Viewport
 
 The claim that Hydra is the interactive one deserves a counterexample. There are four, and they ship.
 
@@ -446,7 +446,7 @@ In none of them is there a change tracker, a render index or a task controller b
 
 A mesh modeler of mine, written against the source of these plugins, reproduces the pattern in Rust with a depth AOV so the rasterized gizmos depth-test against the path-traced image. About ten frames per second on simple scenes with the path tracer live, on a twelve-core Xeon of some age. Nobody has heard of it and that is fine -- I mention it only because the pattern transplanted without modification.
 
-## Where NSI is weak
+## Where NSI Is Weak
 
 An adversarial review has to cut both ways. NSI has real problems. Fewer than I first listed, and I want to explain why the list shrank, because the reasons are the point.
 
@@ -492,11 +492,11 @@ And NSI does have a filter story, it is just not a framework. NSI has a [Lua bin
 
 Caveat: the [`nsi-intermediate`](https://github.com/virtualritz/nsi/tree/master/crates/nsi-intermediate) crate is mine, and it is exactly such a layer, built outside the spec. Which is where it belongs.
 
-## Where Hydra is strong
+## Where Hydra Is Strong
 
 Fine-grained change tracking with parallel sync is serious engineering. A path tracer gets less from it than a rasterizer, but less is not nothing. A single delegate reaches `usdview`, Solaris and `husk`, Katana's viewer, Maya's viewport, Nuke, Blender and Omniverse. In each host, picking, selection, HUD and compositing are already done, so the delegate lands in a finished viewport rather than having to build one. That is what Hydra gives you that NSI does not. It follows from host adoption, not Hydra's architecture. Adoption is out of scope here, but pretending the effect does not exist would be dishonest. The scene index is a good idea, and generative procedurals ([`HdGpGenerativeProcedural`](https://github.com/PixarAnimationStudios/OpenUSD/blob/dev/pxr/imaging/hdGp/generativeProcedural.h), which read the input scene and emit child prims) are a more powerful model than NSI's opaque `procedural` node. Nested point instancing with per-instance primvars is properly specified. Material networks with per-renderer contexts and MaterialX are handled once for everyone. And [hdPrman](https://github.com/PixarAnimationStudios/OpenUSD/tree/dev/third_party/renderman/plugin/hdPrman) proves that a full production renderer fits, at the cost of 2.2 MB of glue and 26 scene-index plugins.
 
-## View one: you own a renderer and need a public API
+## View One: You Own a Renderer and Need a Public API
 
 Three jobs. Expose your scene model. Keep it stable while you change your internals. Let other people build on it, in languages and processes you do not control.
 
@@ -530,7 +530,7 @@ You can do both. I would.
 
 HydraNSI is the existence proof. Put the eleven functions underneath, the delegate on top, and the delegate is a 12k-line adapter somebody else could maintain.
 
-## View two: you write a DCC integration for a renderer
+## View Two: You Write a DCC Integration for a Renderer
 
 Here the case is genuinely less one-sided, and I want to give Hydra its due before taking it away.
 

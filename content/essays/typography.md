@@ -1,5 +1,5 @@
 +++
-title = "Setting this site"
+title = "Setting This Site"
 date = 2026-09-08
 description = "How the type on this site is set, and the measurements behind it."
 
@@ -15,7 +15,7 @@ _Every typographic device this site has, on one page, so a change that breaks on
 
 ---
 
-## Body text
+## Body Text
 
 Justified text is the whole difficulty. A browser breaks one line at a time, so a locally acceptable break can force the next line loose, opening rivers of whitespace down the column. Knuth--Plass weighs the paragraph whole and the difference shows inside the first five lines of any figure-heavy passage.
 
@@ -24,11 +24,11 @@ This second line is exactly that kind of break: no gap above it, an indent inste
 
 Sentences end with a slightly wider space than the words inside them--- English spacing, and the extra width comes from CSS rather than a Unicode space character, because those are not a portable width.
 
-## Small caps, figures and ligatures
+## Small Caps, Figures and Ligatures
 
 Real small caps, not synthesised: <span class="small-caps">nasa</span> and <span class="small-caps">ascii</span>, or the same thing written ****nasa**** with four asterisks either side. Oldstyle figures sit in the text at x-height: 1863, 1,024, 39. Tabular lining figures are used in tables. Ligatures resolve in office, fluffier, and flagstaff.
 
-## Notes in the margin
+## Notes in the Margin
 
 Footnotes become sidenotes where there is room for them[^1], and stay footnotes where there is not[^2].
 

@@ -43,7 +43,7 @@ test("every section and taxonomy page builds", async () => {
 
 test("section listing shows dates and descriptions", async () => {
   const html = (await buildSite()).read("essays/index.html");
-  assert.match(html, /Setting this site/);
+  assert.match(html, /Setting This Site/);
   assert.match(html, /<time/);
 });
 

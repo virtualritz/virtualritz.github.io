@@ -34,6 +34,21 @@ import {
 } from "./lib/dropcap-geometry.js";
 
 const LINES = 3;
+// Optical correction, downward, in CSS px.
+//
+// Deliberately empirical. The cap is sized from ink ratios inkRatios()
+// takes once at REF (240px) and scales, and at the rendered size the three
+// available sources disagree about where the glyph's ink actually ends:
+// canvas actualBoundingBoxDescent says 1px below the baseline, rasterising
+// the same glyph at the same size into a canvas says exactly 0, and a
+// zero-height strut in the element reports a baseline that measures level
+// with the third line to 0.047px — yet the rendered cap plainly sits above
+// that line. Measured in Krita against a rule drawn on the body baseline,
+// at 100% and at 175% browser zoom, it is ~3px either way, which is why
+// this is a constant in CSS px rather than something derived: a CSS-px
+// offset holds at every zoom, and the discrepancy it absorbs is a
+// rasterisation residual no metric on offer reports correctly.
+const CAP_BASELINE_NUDGE_PX = 3;
 // Both were optical nudges, and together they pushed the cap's baseline
 // 7% of the cap box below the third line's baseline — about 6.5px at the
 // 24px/1.58 body, plainly visible as a drop cap sitting lower than the
@@ -252,7 +267,7 @@ async function place(article) {
   glyph.className = "dropcap";
   glyph.textContent = letter;
   glyph.style.fontSize = `${g.size.toFixed(2)}px`;
-  glyph.style.top = `${g.top.toFixed(2)}px`;
+  glyph.style.top = `${(g.top + CAP_BASELINE_NUDGE_PX).toFixed(2)}px`;
   if (weight) glyph.style.fontWeight = String(weight);
   glyph.setAttribute("aria-hidden", "true");
 
